@@ -1,0 +1,37 @@
+[project]
+name = "startup-inventory-management"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jianhong Chen", email = "jjianhongchen@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.2",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.5",
+    "python-dotenv>=1.2.3",
+    "scipy>=1.18.1",
+    "tabulate>=0.10.0",
+]
+
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.6.3",
+]
+viz = [
+    "matplotlib>=3.11.1",
+    "plotly>=7.0.0",
+    "seaborn>=0.13.2",
+    "streamlit>=1.62.0",
+    "streamlit-authenticator>=0.4.2",
+]

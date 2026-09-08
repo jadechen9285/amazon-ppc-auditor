@@ -1,0 +1,9 @@
+services:
+  cpc-optimizer:
+    build: .
+    container_name: margin-rescuer-app
+    ports:
+      - "8501:8501"
+    restart: unless-stopped
+    environment:
+      - TZ=Asia/Taipei

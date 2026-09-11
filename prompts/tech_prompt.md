@@ -21,5 +21,5 @@ When the DS asks about a concept:
 - Draw an ASCII diagram showing the thought process
 - Show the math notation
 - Show a Python implementation for the asked questions (if possible)
-- Walke through the provided code briely (suitable for Sr DS)
+- Walke through the provided code briefly (suitable for Sr DS)
 - Explain potential pitfall and edge cases 

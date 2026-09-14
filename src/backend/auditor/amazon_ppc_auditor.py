@@ -56,27 +56,60 @@ class AmazonPPCAuditor:
         self.df_micro = self.df_mature.groupby(group_ids, as_index=False).agg(agg_func)
 
     def extract_zero_sale_terms(
-        self, 
-        click_threshold: int = 20, 
-        ad_duration_day_threshold: int = 14, 
-        strategic_whitelist: List[str] = None
-    ) -> pd.DataFrame:
-        if self.df_micro.empty:
+            self, 
+            click_multiplier: float = 1.5, 
+            absolute_click_floor: int = 5,
+            ad_duration_day_threshold: int = 14, 
+            strategic_whitelist: List[str] = None
+        ) -> pd.DataFrame:
+            
+        """
+        Filters for zero-sale search terms utilizing a dynamic expected-value click threshold 
+        based on the parent campaign's historical conversion rate.
+        """
+        if self.df_micro.empty or self.df_mature.empty:
             return pd.DataFrame()
             
-        whitelist = [str(term).strip().lower() for term in (strategic_whitelist or [])]
-
-        mask = (
-            (self.df_micro['orders_7d'] == 0) & 
-            (self.df_micro['clicks'] >= click_threshold) & 
-            (self.df_micro['ad_duration_day'] >= ad_duration_day_threshold)
+        # 1. Establish the statistical baseline from mature data
+        camp_stats = self.df_mature.groupby('campaign_name').agg(
+            total_clicks=('clicks', 'sum'), 
+            total_orders=('orders_7d', 'sum')
         )
-        bleeding_df = self.df_micro[mask].copy()
+        
+        camp_stats['cvr'] = np.where(
+            camp_stats['total_clicks'] > 0, 
+            camp_stats['total_orders'] / camp_stats['total_clicks'], 
+            0.05  # Fallback assumption for cold-start campaigns
+        )
+
+        # 2. Slice a working copy to avoid mutating the class state
+        df_working = self.df_micro.copy()
+
+        # 3. Map CVR and compute the dynamic threshold parameter
+        mapped_cvr = df_working['campaign_name'].map(camp_stats['cvr']).fillna(0.05)
+        
+        df_working['dynamic_click_threshold'] = np.maximum(
+            np.ceil((1.0 / mapped_cvr) * click_multiplier),
+            absolute_click_floor
+        )
+
+        # 4. Clean the whitelist for robust matching
+        whitelist = [str(term).strip().lower() for term in (strategic_whitelist or [])]
+        df_working['clean_term'] = df_working['customer_search_term'].str.strip().str.lower()
+
+        # 5. Apply the multi-condition mathematical mask
+        mask = (
+            (df_working['orders_7d'] == 0) & 
+            (df_working['clicks'] >= df_working['dynamic_click_threshold']) & 
+            (df_working['ad_duration_day'] >= ad_duration_day_threshold)
+        )
+        
+        bleeding_df = df_working[mask].copy()
 
         if bleeding_df.empty:
-            return bleeding_df
+            return bleeding_df.drop(columns=['clean_term', 'dynamic_click_threshold'], errors='ignore')
 
-        bleeding_df['clean_term'] = bleeding_df['customer_search_term'].str.strip().str.lower()
+        # 6. Tag strategic keywords vs actionable bleeders
         bleeding_df['audit_action'] = np.where(
             bleeding_df['clean_term'].isin(whitelist),
             'Strategic (Hold)',
@@ -86,7 +119,7 @@ class AmazonPPCAuditor:
         return (
             bleeding_df
             .sort_values(by=['audit_action', 'spend'], ascending=[True, False])
-            .drop(columns=['clean_term'])
+            .drop(columns=['clean_term']) # Keep dynamic_click_threshold for UI transparency
         )
 
     def extract_top_performing_terms(
@@ -169,6 +202,22 @@ class AmazonPPCAuditor:
         active['allowable_spend'] = active['total_sales'] * break_even_acos
         active['capital_lost'] = active['total_spend'] - active['allowable_spend']
 
+        # --- Injecting Liability-Safe Recommendations ---
+        conditions = [
+            (active['total_sales'] == 0) & (active['total_spend'] >= min_spend_threshold),
+            (active['realized_acos'] > (break_even_acos * 2.0)),
+            (active['realized_acos'] > break_even_acos)
+        ]
+        
+        choices = [
+            "需排查 (Investigate): 零转化，建议审查搜索词报告注入否定词",
+            "建议降价 (Deflate): ACoS 严重超标，考虑整体下调基础竞价 15-20%",
+            "建议限额 (Cap Budget): 轻微亏损，考虑降低单日预算以提升流量效率"
+        ]
+        
+        active['consultative_action'] = np.select(conditions, choices, default="健康 (Healthy)")
+        
+        # Filter for unprofitable bleeders
         unprofitable = active[active['realized_acos'] > break_even_acos].sort_values(
             by='capital_lost', ascending=False
         ).reset_index(drop=True)

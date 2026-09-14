@@ -8,7 +8,7 @@ def render_audit_dashboard(auditor): # auditor is an initialized AmazonPPCAudito
     st.caption("基于微观广告组级别的数据聚合，为您精准定位利润泄漏点与扩张机会。")
 
     # Fetch Data
-    df_bleeders = auditor.extract_zero_sale_terms(click_threshold=15)
+    df_bleeders = auditor.extract_zero_sale_terms()
     cannibal_data = auditor.detect_match_type_cannibalization()
     fragility_data = auditor.assess_portfolio_fragility()
     breakeven_data = auditor.evaluate_campaign_breakeven_health()
@@ -99,6 +99,15 @@ def render_audit_dashboard(auditor): # auditor is an initialized AmazonPPCAudito
 
     with tab3:
         st.subheader("🌟 黄金扩展词 (Top Performers)")
+
+        st.warning(
+            "⚠️ **A9 权重迁移警告 (Migration Risk):**\n\n"
+            "不要直接暂停原广告组中的词！直接迁移会导致该词历史权重清零。请采用 **平滑过渡法 (Peel & Stick)**：\n"
+            "1. 将词提取到全新的 SKAG 精准组，给予充足预算。\n"
+            "2. 保留原广告组中的该词，但将其竞价 (Bid) 降低 30%-50%。\n"
+            "3. 观察 7-14 天，等新组 A9 权重建立并稳定出单后，再将原组词精确否定或完全降价。"
+        )
+
         st.write("高转化且ACoS低于盈亏平衡线的优质词，建议**移至独立精准广告组 (SKAG)** 并放大预算。")
         if not df_winners.empty:
             st.dataframe(

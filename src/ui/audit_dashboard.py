@@ -1,20 +1,20 @@
 import streamlit as st
 
-# from src.auditor.amazon_ppc_auditor import AmazonPPCAuditor
 
-def render_audit_dashboard(auditor): # auditor is an initialized AmazonPPCAuditor instance
-
-    st.title("📊 亚马逊 PPC 深度审计报告")
+def render_audit_dashboard(auditor, global_margin:float): 
+    st.title("📊 亚马逊 SP 广告深度审计 (Sponsored Products)")
     st.caption("基于微观广告组级别的数据聚合，为您精准定位利润泄漏点与扩张机会。")
 
     # Fetch Data
     df_bleeders = auditor.extract_zero_sale_terms()
     cannibal_data = auditor.detect_match_type_cannibalization()
     fragility_data = auditor.assess_portfolio_fragility()
-    breakeven_data = auditor.evaluate_campaign_breakeven_health()
-    df_winners = auditor.extract_top_performing_terms()
 
-    # Hero Metrics (Updated to $)
+    # Ingest global_margin here
+    breakeven_data = auditor.evaluate_campaign_breakeven_health(break_even_acos=global_margin)
+    df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)
+
+    # Hero Metrics
     total_waste = df_bleeders['spend'].sum() if not df_bleeders.empty else 0.0
     total_waste += cannibal_data.get('total_cannibalized_spend', 0.0)
     
@@ -34,13 +34,16 @@ def render_audit_dashboard(auditor): # auditor is an initialized AmazonPPCAudito
         st.write("点击量过高但从未产生订单的搜索词，建议立即添加为**精准否定 (Negative Exact)**。")
         if not df_bleeders.empty:
             st.dataframe(
-                df_bleeders[['audit_action', 'campaign_name', 'ad_group_name', 'customer_search_term', 'clicks', 'spend']],
+                # Added match_type and dynamic_click_threshold
+                df_bleeders[['audit_action', 'campaign_name', 'ad_group_name', 'customer_search_term', 'match_type', 'clicks', 'dynamic_click_threshold', 'spend']],
                 column_config={
                     "audit_action": "系统建议操作",
                     "campaign_name": "广告活动",
                     "ad_group_name": "广告组",
                     "customer_search_term": "客户搜索词",
-                    "clicks": st.column_config.NumberColumn("白嫖点击数"),
+                    "match_type": "匹配类型",
+                    "clicks": st.column_config.NumberColumn("实际点击数"),
+                    "dynamic_click_threshold": st.column_config.NumberColumn("动态容忍阈值"),
                     "spend": st.column_config.NumberColumn("浪费花费", format="$%.2f")
                 },
                 use_container_width=True, hide_index=True
@@ -68,24 +71,25 @@ def render_audit_dashboard(auditor): # auditor is an initialized AmazonPPCAudito
         df_loss = breakeven_data['unprofitable_campaigns_df']
         if not df_loss.empty:
             
-            # --- VISUALIZATION ADDITION ---
             st.write("##### 亏损分布矩阵 (Loss Distribution Matrix)")
             st.caption("气泡大小代表净亏损金额。位于左上方的广告活动正在消耗大量预算却鲜有产出。")
             
-            # Native Streamlit scatter chart mapped to our backend variables
             st.scatter_chart(
                 df_loss,
                 x='total_sales',
                 y='total_spend',
                 size='capital_lost',
-                color='#ff4b4b', # Use a strict alert red
+                color='#ff4b4b', 
                 height=350
             )
             
-            # --- FIXED TABLE BASED ON IMAGE FEEDBACK ---
+            # Reordered to put consultative_action up front
+            columns_to_display = ['consultative_action', 'campaign_name', 'total_spend', 'total_sales', 'total_orders', 'realized_acos', 'allowable_spend', 'capital_lost']
+            
             st.dataframe(
-                df_loss,
+                df_loss[columns_to_display],
                 column_config={
+                    "consultative_action": "系统建议 (Action)",
                     "campaign_name": "广告活动",
                     "total_spend": st.column_config.NumberColumn("总花费", format="$%.2f"),
                     "total_sales": st.column_config.NumberColumn("总销售额", format="$%.2f"),
@@ -108,16 +112,18 @@ def render_audit_dashboard(auditor): # auditor is an initialized AmazonPPCAudito
             "3. 观察 7-14 天，等新组 A9 权重建立并稳定出单后，再将原组词精确否定或完全降价。"
         )
 
-        st.write("高转化且ACoS低于盈亏平衡线的优质词，建议**移至独立精准广告组 (SKAG)** 并放大预算。")
+        st.write("高转化且ACoS低于盈亏平衡线的优质词，根据其当前匹配类型执行不同扩量策略。")
         if not df_winners.empty:
             st.dataframe(
-                df_winners[['audit_action', 'campaign_name', 'customer_search_term', 'orders_7d', 'acos', 'gross_profit']],
+                # Added match_type to contextualize the dynamic audit_action
+                df_winners[['audit_action', 'campaign_name', 'customer_search_term', 'match_type', 'orders_7d', 'acos', 'gross_profit']],
                 column_config={
                     "audit_action": "系统建议操作",
                     "campaign_name": "来源广告活动",
                     "customer_search_term": "优质搜索词",
+                    "match_type": "当前匹配类型",
                     "orders_7d": "订单量",
-                    "acos": st.column_config.NumberColumn("实际 ACoS"),
+                    "acos": st.column_config.NumberColumn("实际 ACoS", format="%.2f"),
                     "gross_profit": st.column_config.NumberColumn("预估毛利润贡献", format="$%.2f")
                 },
                 use_container_width=True, hide_index=True

@@ -44,7 +44,7 @@ class AmazonPPCAuditor:
         self.observation_days = max(1, (cutoff_date - self.df_mature['start_date'].min()).days)
 
         # 2. Compute Standard Micro-Aggregation
-        group_ids = ['campaign_name', 'ad_group_name', 'customer_search_term']
+        group_ids = ['campaign_name', 'ad_group_name', 'match_type', 'customer_search_term']
         agg_func = {
             'impressions': 'sum',
             'clicks': 'sum',
@@ -112,8 +112,8 @@ class AmazonPPCAuditor:
         # 6. Tag strategic keywords vs actionable bleeders
         bleeding_df['audit_action'] = np.where(
             bleeding_df['clean_term'].isin(whitelist),
-            'Strategic (Hold)',
-            'Negative Exact'
+            '战略保留 (Strategic Hold)',
+            '精准否定 (Negative Exact)'
         )
 
         return (
@@ -143,7 +143,27 @@ class AmazonPPCAuditor:
 
         winners_df = winners_df[winners_df['acos'] < break_even_acos].copy()
         winners_df['gross_profit'] = (winners_df['total_sales_7d'] * break_even_acos) - winners_df['spend']
-        winners_df['audit_action'] = 'Scale'
+        
+        # --- Context-Aware, Liability-Safe Tags ---
+        # Normalize the match_type column for safe string comparison
+        match_type_normalized = winners_df['match_type'].str.strip().str.upper()
+        
+        conditions = [
+            match_type_normalized == 'EXACT',
+            match_type_normalized.isin(['BROAD', 'PHRASE', 'AUTO']) # or simply the inverse
+        ]
+        
+        choices = [
+            '建议逐步提价/放宽预算 (Evaluate Bid/Budget Increase)',
+            '建议提取至精准组测试 (Consider Exact Extraction)'
+        ]
+        
+        # Default handles any edge cases like missing match types
+        winners_df['audit_action'] = np.select(
+            conditions, 
+            choices, 
+            default='建议关注并放大流量 (Consider Scaling Traffic)'
+        )
 
         return winners_df.sort_values(by='gross_profit', ascending=False)
 
@@ -236,14 +256,9 @@ class AmazonPPCAuditor:
             return {"total_cannibalized_spend": 0.0, "overlap_df": pd.DataFrame()}
 
         # Requires match_type, so we must run a specific group-by distinct from self.df_micro
-        grouped = self.df_mature.groupby(
-            ['customer_search_term', 'campaign_name', 'ad_group_name', 'match_type'], 
-            as_index=False
-        ).agg(
-            spend=('spend', 'sum'),
-            sales=('total_sales_7d', 'sum'),
-            clicks=('clicks', 'sum')
-        )
+        grouped = self.df_micro.rename(columns={
+            'total_sales_7d' :'sales',
+        } )
 
         grouped = grouped[grouped['spend'] >= min_spend_filter].copy()
         if grouped.empty:
@@ -267,7 +282,11 @@ class AmazonPPCAuditor:
         overlap_df['efficiency_rank'] = overlap_df.groupby('customer_search_term').cumcount() + 1
         losers_df = overlap_df[overlap_df['efficiency_rank'] > 1]
 
-        overlap_df['status'] = np.where(overlap_df['efficiency_rank'] == 1, 'Winner', 'Loser (Pause)')
+        overlap_df['status'] = np.where(
+            overlap_df['efficiency_rank'] == 1, 
+            '优势词 (Winner)', 
+            '劣势词，建议暂停 (Loser - Consider Pausing)'
+        )
 
         return {
             "total_cannibalized_spend": float(losers_df['spend'].sum()),

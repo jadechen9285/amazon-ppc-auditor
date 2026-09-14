@@ -16,6 +16,24 @@ if st.session_state.get("authentication_status"):
     with st.sidebar:
         st.write(f"### 欢迎回来, *{st.session_state['name']}*")
         st.divider()
+
+        # --- Injecting the Aesthetic Financial Control ---
+        st.subheader("⚙️ 财务配置 (Financial Settings)")
+        
+        # We use whole numbers (10 to 80) for UX, but convert to float (0.10 to 0.80) for the backend
+        global_margin_pct = st.slider(
+            "🎯 盈亏平衡 ACoS (Break-even Margin)", 
+            min_value=10, 
+            max_value=80, 
+            value=30, 
+            step=1,
+            help="您的产品净毛利率。当实际 ACoS 超过此数值时，广告即产生绝对亏损。"
+        )
+        global_margin_float = global_margin_pct / 100.0
+        
+        st.divider()
+
+        ## 
         uploaded_file = st.file_uploader("📥 上传搜索词报告", type=['xlsx', 'csv'])
     
     if uploaded_file is not None:
@@ -27,7 +45,7 @@ if st.session_state.get("authentication_status"):
         df_clean = raw_df # Replace with your actual cleaner
         
         auditor = AmazonPPCAuditor(df_clean)
-        render_audit_dashboard(auditor)
+        render_audit_dashboard(auditor, global_margin=global_margin_float)
         
     else:
         # Use the wide main canvas to show a beautiful placeholder

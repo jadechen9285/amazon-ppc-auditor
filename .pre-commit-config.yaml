@@ -1,0 +1,11 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.7 # Always pin a specific version, never use 'main'
+    hooks:
+      - id: ruff-check
+        # We only pass execution flags here, NO rule definitions
+        args: [ --fix ]
+        # Exclude Jupyter notebooks from standard linting
+        types_or: [ python, pyi ]
+      - id: ruff-format
+        types_or: [ python, pyi ]

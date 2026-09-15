@@ -32,6 +32,8 @@ default = true
 [dependency-groups]
 dev = [
     "jupyterlab>=4.6.3",
+    "pre-commit>=4.6.2",
+    "ruff==0.16.7",
 ]
 viz = [
     "matplotlib>=3.11.1",
@@ -40,3 +42,19 @@ viz = [
     "streamlit>=1.62.0",
     "streamlit-authenticator>=0.4.2",
 ]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+# ALL rules are defined here. The IDE and pre-commit will both read this.
+select = ["E", "W", "F", "I", "UP"]
+
+# E501: Ignore line length (Ruff format handles code wrapping natively; strings shouldn't be forced)
+# W293: Ignore whitespace on blank lines (prevents conflicts inside multi-line UI markdown)
+ignore = ["E501", "W293"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"

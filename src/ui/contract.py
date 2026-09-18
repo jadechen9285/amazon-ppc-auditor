@@ -15,7 +15,7 @@ class UIContract:
         'targeting': '投放目标',
         'customer_search_term': '客户搜索词',
         'clicks': '实际点击数',
-        'dynamic_click_threshold': '动态容忍阈值',
+        'dynamic_click_threshold': '无单止损点击数',
         # Unified Financial & Metric Terms
         'spend': '总花费',
         'total_spend': '总花费',
@@ -24,9 +24,9 @@ class UIContract:
         'orders_7d': '订单量',
         'realized_acos': '实际 ACoS',
         'acos': '实际 ACoS',
-        'allowable_spend': '允许花费阈值',
-        'capital_lost': '纯利润净亏损',
-        'gross_profit': '预估毛利润贡献',
+        'allowable_spend': '保本花费上限',
+        'capital_lost': '实际亏损金额',
+        'gross_profit': '预估广告净赚',
     }
 
     # Define strict sets for programmatic formatting

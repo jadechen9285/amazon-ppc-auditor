@@ -30,7 +30,7 @@ def render_audit_dashboard(auditor, global_margin: float):
         value=f'${total_waste:,.2f}',
         delta='- 立即操作',
         delta_color='inverse',
-        help='计算逻辑：[无转化无效花费] + [同词竞价互斥中的劣势词花费]。这部分预算完全未产生转化或属于自我消耗，可通过执行下方表格的操作立即止损。',
+        help='计算逻辑：[无转化无效花费] + [流量互斥与内卷]。这部分预算完全未产生转化或属于自我消耗，可通过执行下方表格的操作立即止损。',
     )
 
     col2.metric(

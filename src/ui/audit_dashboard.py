@@ -4,12 +4,14 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from ui.contract import UIContract
+
 
 def render_audit_dashboard(auditor, global_margin: float):
     st.title('📊 亚马逊 SP 广告深度审计 (Sponsored Products)')
     st.caption('基于微观广告组级别的数据聚合，为您精准定位利润泄漏点与扩张机会。')
 
-    # Fetch Data``
+    # Fetch Data
     df_bleeders = auditor.extract_zero_sale_terms()
     cannibal_data = auditor.detect_match_type_cannibalization()
     fragility_data = auditor.assess_portfolio_fragility()
@@ -58,40 +60,45 @@ def render_audit_dashboard(auditor, global_margin: float):
         # --- White-Box UI: The Accordion ---
         with st.expander('💡 算法原理解析 (How We Calculate This)'):
             st.markdown("""
-            **1. 动态容忍阈值 (Dynamic Click Threshold):**
-            系统**没有**使用死板的固定规则（例如“满15次点击无转化就暂停”）。
-            算法首先计算该广告活动的**历史平均转化率**，推算出一单所需的预期点击量。只有当一个搜索词的点击量超过预期的 1.5 倍（包含安全缓冲期）且仍未出单时，系统才会判定其为真正的“无效花费”。
+            **1. 智能点击止损 (该给一个词多少次机会？):**
+            我们不搞一刀切（比如死规定15次点击没出单就全关掉）。
+            系统会先算一算，你平时的广告大概**几次点击能卖出一单**？比如你平时平均 10 次点击出一单，如果有个词被点了 15 次甚至更多，却连一单都没出，我们才会判定它在白白浪费你的钱，建议立刻拉黑（精准否定）。
             
-            **2. 流量互斥 (Cannibalization):**
-            当您的多个匹配方式（如广泛、词组、自动）同时为同一个搜索词竞价时，您实际上是在**自己和自己竞价**，抬高了单次点击成本 (CPC)。系统会对比它们的转化效率，保留最优解，建议暂停内部竞争者。
+            **2. 避免自己人打自己人 (流量内卷):**
+            有时候，你的自动广告、广泛匹配都在抢同一个搜索词。这其实是在**自己抬高自己的广告费 (CPC)**。系统会帮你找出谁表现最好，把多余的关掉，把钱花在刀刃上。
             """)
 
         st.write('点击量过高但从未产生订单的搜索词，建议立即添加为**精准否定 (Negative Exact)**。')
 
         if not df_bleeders.empty:
             st.dataframe(
-                # Added match_type and dynamic_click_threshold
                 df_bleeders[
                     [
                         'audit_action',
                         'campaign_name',
                         'ad_group_name',
-                        'customer_search_term',
                         'match_type',
+                        'targeting',
+                        'customer_search_term',
                         'clicks',
                         'dynamic_click_threshold',
                         'spend',
                     ]
                 ],
                 column_config={
-                    'audit_action': '系统建议操作',
-                    'campaign_name': '广告活动',
-                    'ad_group_name': '广告组',
-                    'customer_search_term': '客户搜索词',
-                    'match_type': '匹配类型',
-                    'clicks': st.column_config.NumberColumn('实际点击数'),
-                    'dynamic_click_threshold': st.column_config.NumberColumn('动态容忍阈值'),
-                    'spend': st.column_config.NumberColumn('浪费花费', format='$%.2f'),
+                    'audit_action': UIContract.get_label('audit_action'),
+                    'campaign_name': UIContract.get_label('campaign_name'),
+                    'ad_group_name': UIContract.get_label('ad_group_name'),
+                    'match_type': UIContract.get_label('match_type'),
+                    'targeting': UIContract.get_label('targeting'),
+                    'customer_search_term': UIContract.get_label('customer_search_term'),
+                    'clicks': st.column_config.NumberColumn(UIContract.get_label('clicks')),
+                    'dynamic_click_threshold': st.column_config.NumberColumn(
+                        UIContract.get_label('dynamic_click_threshold')
+                    ),
+                    'spend': st.column_config.NumberColumn(
+                        UIContract.get_label('spend'), format='$%.2f'
+                    ),
                 },
                 use_container_width=True,
                 hide_index=True,
@@ -102,14 +109,24 @@ def render_audit_dashboard(auditor, global_margin: float):
         if not cannibal_data['overlap_df'].empty:
             st.dataframe(
                 cannibal_data['overlap_df'][
-                    ['status', 'customer_search_term', 'campaign_name', 'match_type', 'spend']
+                    [
+                        'status',
+                        'customer_search_term',
+                        'campaign_name',
+                        'match_type',
+                        'targeting',
+                        'spend',
+                    ]
                 ],
                 column_config={
-                    'status': '胜败状态',
-                    'customer_search_term': '冲突搜索词',
-                    'campaign_name': '所属广告活动',
-                    'match_type': '匹配类型',
-                    'spend': st.column_config.NumberColumn('花费', format='$%.2f'),
+                    'status': UIContract.get_label('status'),
+                    'customer_search_term': UIContract.get_label('customer_search_term'),
+                    'campaign_name': UIContract.get_label('campaign_name'),
+                    'match_type': UIContract.get_label('match_type'),
+                    'targeting': UIContract.get_label('targeting'),
+                    'spend': st.column_config.NumberColumn(
+                        UIContract.get_label('spend'), format='$%.2f'
+                    ),
                 },
                 use_container_width=True,
                 hide_index=True,
@@ -121,10 +138,11 @@ def render_audit_dashboard(auditor, global_margin: float):
         # --- White-Box UI: The Accordion ---
         with st.expander('💡 算法原理解析 (How We Calculate This)'):
             st.markdown("""
-            **纯利润净亏损 (Capital Lost) 的计算逻辑：**
-            这不是简单的总花费。系统基于您在侧边栏设定的 **盈亏平衡线 (Break-even Margin)** 进行逆向推算。
+            **怎么算出“纯利润净亏损”的？**
+            这不是单纯看你花了多少广告费，而是结合了你设定的**毛利率 (Break-even Margin)** 算出来的一笔结结实实的经济账。
             
-            例如：如果您设定毛利为 30%，产生 $100 销售额时，您的“允许最高花费”就是 $30。如果实际花费了 $50，系统会精准标注出 $20 的**纯利润净亏损**。这帮您一眼看出哪些活动在抽干您的现金流。
+            **举个例子：**
+            如果你设定的毛利是 30%，当你卖了 $100 时，按理说广告费绝不能超过 $30。如果你实际花了 $50 广告费，那么多出来的这 $20，就是**直接从你口袋里掏走的净亏损**。这个页面帮你一眼揪出这些正在抽干你现金流的“吞金兽”。
             """)
 
         st.write(
@@ -136,28 +154,28 @@ def render_audit_dashboard(auditor, global_margin: float):
             st.write('##### 亏损分布矩阵 (Loss Distribution Matrix)')
             st.caption('气泡大小代表净亏损金额。位于左上方的广告活动正在消耗大量预算却鲜有产出。')
 
-            chart_view = df_loss[['total_sales', 'total_spend', 'capital_lost']].copy()
+            # Fetch the Excel map to leverage the automatic "($)" suffixes for the chart axes
+            excel_map = UIContract.get_excel_map()
 
-            # 2. Rename the columns to professional frontend labels
+            chart_view = df_loss[['total_sales', 'total_spend', 'capital_lost']].copy()
             chart_map = {
-                'total_sales': '总销售额 ($)',
-                'total_spend': '总花费 ($)',
-                'capital_lost': '纯利润净亏损 ($)',
+                'total_sales': excel_map['total_sales'],
+                'total_spend': excel_map['total_spend'],
+                'capital_lost': excel_map['capital_lost'],
             }
             chart_view = chart_view.rename(columns=chart_map)
 
             st.scatter_chart(
                 chart_view,
-                x='总销售额 ($)',
-                y='总花费 ($)',
-                size='纯利润净亏损 ($)',
+                x=excel_map['total_sales'],
+                y=excel_map['total_spend'],
+                size=excel_map['capital_lost'],
                 color='#ff4b4b',
                 height=350,
             )
 
             # --- THE VIEW LAYER TRANSFORMATION ---
             df_loss_view = df_loss.copy()
-            # Handle infinite values (when sales = 0) gracefully before multiplication
             df_loss_view['realized_acos'] = np.where(
                 np.isinf(df_loss_view['realized_acos']), 0.0, df_loss_view['realized_acos'] * 100
             )
@@ -176,17 +194,26 @@ def render_audit_dashboard(auditor, global_margin: float):
             st.dataframe(
                 df_loss_view[columns_to_display],
                 column_config={
-                    'consultative_action': '系统建议 (Action)',
-                    'campaign_name': '广告活动',
-                    'total_spend': st.column_config.NumberColumn('总花费', format='$%.2f'),
-                    'total_sales': st.column_config.NumberColumn('总销售额', format='$%.2f'),
-                    'total_orders': st.column_config.NumberColumn('总订单量'),
-                    # Format as percentage with 2 decimals
-                    'realized_acos': st.column_config.NumberColumn('实际 ACoS', format='%.2f%%'),
-                    'allowable_spend': st.column_config.NumberColumn(
-                        '允许花费阈值', format='$%.2f'
+                    'consultative_action': UIContract.get_label('consultative_action'),
+                    'campaign_name': UIContract.get_label('campaign_name'),
+                    'total_spend': st.column_config.NumberColumn(
+                        UIContract.get_label('total_spend'), format='$%.2f'
                     ),
-                    'capital_lost': st.column_config.NumberColumn('纯利润净亏损', format='$%.2f'),
+                    'total_sales': st.column_config.NumberColumn(
+                        UIContract.get_label('total_sales'), format='$%.2f'
+                    ),
+                    'total_orders': st.column_config.NumberColumn(
+                        UIContract.get_label('total_orders')
+                    ),
+                    'realized_acos': st.column_config.NumberColumn(
+                        UIContract.get_label('realized_acos'), format='%.2f%%'
+                    ),
+                    'allowable_spend': st.column_config.NumberColumn(
+                        UIContract.get_label('allowable_spend'), format='$%.2f'
+                    ),
+                    'capital_lost': st.column_config.NumberColumn(
+                        UIContract.get_label('capital_lost'), format='$%.2f'
+                    ),
                 },
                 use_container_width=True,
                 hide_index=True,
@@ -198,10 +225,11 @@ def render_audit_dashboard(auditor, global_margin: float):
         # --- White-Box UI: The Accordion ---
         with st.expander('💡 算法原理解析 (How We Calculate This)'):
             st.markdown("""
-            **动态扩量策略 (Context-Aware Scaling):**
-            系统筛选出出单稳定（≥3单）且 ACoS 严格低于您盈亏平衡线的优质词。
-            - 如果该词已经是 **精准匹配 (Exact)**：系统建议您原位提高竞价或放宽预算。
-            - 如果该词属于 **广泛/词组/自动 (Broad/Phrase/Auto)**：系统建议将其剥离，建立独立的精准广告组 (SKAG)，以独占顶部流量，同时防止原广告组权重受损。
+            **如何安全地把好词放大？**
+            系统帮你挑出了既能稳定出单，又不会让你亏钱的“神仙词”。
+            
+            - **如果它已经是精准匹配：** 说明定位很准，建议直接加点竞价或预算，让它跑得更好。
+            - **如果它是从自动或广泛广告里跑出来的：** 建议把它单独拿出来，建一个新的“精准广告组”。给它专属的预算去抢占搜索页顶部，同时这么做也不会破坏你原来广告组的节奏。
             """)
 
         st.warning(
@@ -209,9 +237,7 @@ def render_audit_dashboard(auditor, global_margin: float):
         )
 
         st.write('高转化且ACoS低于盈亏平衡线的优质词，根据其当前匹配类型执行不同扩量策略。')
-        df_winners = breakeven_data.get(
-            'unprofitable_campaigns_df', pd.DataFrame()
-        )  # Placeholder check
+
         df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)
 
         if not df_winners.empty:
@@ -224,22 +250,27 @@ def render_audit_dashboard(auditor, global_margin: float):
                     [
                         'audit_action',
                         'campaign_name',
-                        'customer_search_term',
                         'match_type',
+                        'targeting',
+                        'customer_search_term',
                         'orders_7d',
                         'acos',
                         'gross_profit',
                     ]
                 ],
                 column_config={
-                    'audit_action': '系统建议操作',
-                    'campaign_name': '来源广告活动',
-                    'customer_search_term': '优质搜索词',
-                    'match_type': '当前匹配类型',
-                    'orders_7d': '订单量',
-                    # Format as percentage with 2 decimals
-                    'acos': st.column_config.NumberColumn('实际 ACoS', format='%.2f%%'),
-                    'gross_profit': st.column_config.NumberColumn('预估毛利润贡献', format='$%.2f'),
+                    'audit_action': UIContract.get_label('audit_action'),
+                    'campaign_name': UIContract.get_label('campaign_name'),
+                    'match_type': UIContract.get_label('match_type'),
+                    'targeting': UIContract.get_label('targeting'),
+                    'customer_search_term': UIContract.get_label('customer_search_term'),
+                    'orders_7d': st.column_config.NumberColumn(UIContract.get_label('orders_7d')),
+                    'acos': st.column_config.NumberColumn(
+                        UIContract.get_label('acos'), format='%.2f%%'
+                    ),
+                    'gross_profit': st.column_config.NumberColumn(
+                        UIContract.get_label('gross_profit'), format='$%.2f'
+                    ),
                 },
                 use_container_width=True,
                 hide_index=True,
@@ -256,33 +287,12 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
     breakeven_data = auditor.evaluate_campaign_breakeven_health(break_even_acos=global_margin)
     df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)
 
-    # 2. Define the Universal Transformation Matrix (Localization)
-    localization_map = {
-        'audit_action': '系统建议操作',
-        'consultative_action': '系统建议 (Action)',
-        'status': '胜败状态',
-        'campaign_name': '广告活动',
-        'ad_group_name': '广告组',
-        'customer_search_term': '客户搜索词',
-        'match_type': '匹配类型',
-        'clicks': '实际点击数',
-        'dynamic_click_threshold': '动态容忍阈值',
-        'spend': '总花费 ($)',
-        'total_spend': '总花费 ($)',
-        'total_sales': '总销售额 ($)',
-        'total_orders': '总订单量',
-        'orders_7d': '订单量',
-        'realized_acos': '实际 ACoS',
-        'acos': '实际 ACoS',
-        'allowable_spend': '允许花费阈值 ($)',
-        'capital_lost': '纯利润净亏损 ($)',
-        'gross_profit': '预估毛利润贡献 ($)',
-    }
+    # 2. Extract the automated Excel Transformation Matrix
+    localization_map = UIContract.get_excel_map()
 
     # 3. Initialize the RAM Buffer and Excel Writer
     buffer = io.BytesIO()
 
-    # xlsxwriter handles CJK encoding natively and beautifully
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         # Sheet 1: Bleeders
         if not df_bleeders.empty:
@@ -291,8 +301,9 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                     'audit_action',
                     'campaign_name',
                     'ad_group_name',
-                    'customer_search_term',
                     'match_type',
+                    'targeting',
+                    'customer_search_term',
                     'clicks',
                     'dynamic_click_threshold',
                     'spend',
@@ -305,7 +316,14 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
         # Sheet 2: Cannibalization
         if not cannibal_data['overlap_df'].empty:
             view = cannibal_data['overlap_df'][
-                ['status', 'customer_search_term', 'campaign_name', 'match_type', 'spend']
+                [
+                    'status',
+                    'customer_search_term',
+                    'campaign_name',
+                    'match_type',
+                    'targeting',
+                    'spend',
+                ]
             ].copy()
             view.rename(columns=localization_map).to_excel(
                 writer, sheet_name='流量内卷 (Cannibalization)', index=False
@@ -327,8 +345,8 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                 ]
             ].copy()
             view['realized_acos'] = np.where(
-                np.isinf(view['realized_acos']), 0, view['realized_acos']
-            )  # Fix infinity
+                np.isinf(view['realized_acos']), 0.0, view['realized_acos']
+            )
             view.rename(columns=localization_map).to_excel(
                 writer, sheet_name='结构亏损 (Loss)', index=False
             )
@@ -339,8 +357,9 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                 [
                     'audit_action',
                     'campaign_name',
-                    'customer_search_term',
                     'match_type',
+                    'targeting',
+                    'customer_search_term',
                     'orders_7d',
                     'acos',
                     'gross_profit',

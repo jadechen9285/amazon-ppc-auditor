@@ -23,7 +23,6 @@ class AmazonPPCAuditor:
         self._prepare_base_data()
 
     def _prepare_base_data(self):
-        """Internal method to compute truncated and aggregated dataframes once."""
         if self.df_clean.empty or 'end_date' not in self.df_clean.columns:
             return
 
@@ -34,17 +33,25 @@ class AmazonPPCAuditor:
         max_date = self.df_clean['end_date'].max()
         cutoff_date = max_date - pd.Timedelta(days=self.lag_days)
 
-        # 1. Compute Mature Data (Truncated)
         self.df_mature = self.df_clean[self.df_clean['end_date'] <= cutoff_date].copy()
-
         if self.df_mature.empty:
             return
 
         self.df_mature['ad_duration_day'] = (max_date - self.df_mature['start_date']).dt.days
         self.observation_days = max(1, (cutoff_date - self.df_mature['start_date'].min()).days)
 
-        # 2. Compute Standard Micro-Aggregation
-        group_ids = ['campaign_name', 'ad_group_name', 'match_type', 'customer_search_term']
+        # --- THE FIX: The 5-Dimensional Composite Key ---
+        group_ids = [
+            'campaign_name',
+            'ad_group_name',
+            'match_type',
+            'targeting',
+            'customer_search_term',
+        ]
+
+        # Defensive check: Only group by columns that actually exist in the schema
+        valid_group_ids = [col for col in group_ids if col in self.df_mature.columns]
+
         agg_func = {
             'impressions': 'sum',
             'clicks': 'sum',
@@ -53,7 +60,8 @@ class AmazonPPCAuditor:
             'total_sales_7d': 'sum',
             'ad_duration_day': 'mean',
         }
-        self.df_micro = self.df_mature.groupby(group_ids, as_index=False).agg(agg_func)
+
+        self.df_micro = self.df_mature.groupby(valid_group_ids, as_index=False).agg(agg_func)
 
     def extract_zero_sale_terms(
         self,

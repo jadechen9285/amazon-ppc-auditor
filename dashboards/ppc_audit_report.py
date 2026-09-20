@@ -16,18 +16,21 @@ st.set_page_config(
 )
 
 # Custom CSS to hide Streamlit watermarks and tighten header padding
+# Custom CSS to hide Streamlit watermarks and tighten header padding
 st.markdown(
     """
     <style>
+        /*
+        Removed `header {visibility: hidden;}` to restore the sidebar toggle button.
+        Relying on config.toml `toolbarMode = "minimal"` to hide the right-side menus.
+        */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        header {visibility: hidden;}
         .block-container {padding-top: 2rem; padding-bottom: 2rem;}
     </style>
 """,
     unsafe_allow_html=True,
 )
-
 
 # -------------------------------------------------------------
 # 🛡️ ALPHA ACCESS GATEKEEPER

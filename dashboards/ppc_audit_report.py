@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -5,82 +7,131 @@ from backend.auditor.amazon_ppc_auditor import AmazonPPCAuditor
 from backend.schema import AmazonSPSchema, SchemaValidationError
 from ui.audit_dashboard import generate_excel_report, render_audit_dashboard
 
-# 1. ENFORCE WIDE LAYOUT (Must be the first st command)
-st.set_page_config(page_title='PPC Auditor', layout='wide', initial_sidebar_state='expanded')
+# Enforce wide layout
+st.set_page_config(
+    page_title='SP PPC 智能审计专家 | Alpha',
+    page_icon='📊',
+    layout='wide',
+    initial_sidebar_state='expanded',
+)
 
-# --- Dev Bypass ---
-if 'authentication_status' not in st.session_state:
-    st.session_state['authentication_status'] = True
-    st.session_state['name'] = 'Jianhong (Dev)'
+# Custom CSS to hide Streamlit watermarks and tighten header padding
+st.markdown(
+    """
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .block-container {padding-top: 2rem; padding-bottom: 2rem;}
+    </style>
+""",
+    unsafe_allow_html=True,
+)
 
-if st.session_state.get('authentication_status'):
-    # 2. MOVE CONTROLS TO SIDEBAR
-    with st.sidebar:
-        st.write(f'### 欢迎回来, *{st.session_state["name"]}*')
-        st.divider()
 
-        # --- Injecting the Aesthetic Financial Control ---
-        st.subheader('⚙️ 财务配置 (Financial Settings)')
+# -------------------------------------------------------------
+# 🛡️ ALPHA ACCESS GATEKEEPER
+# -------------------------------------------------------------
+ALPHA_ACCESS_KEY = os.environ.get('ALPHA_INVITE_CODE', 'SELLER2026')
 
-        # We use whole numbers (10 to 80) for UX, but convert to float (0.10 to 0.80) for the backend
-        global_margin_pct = st.slider(
-            '🎯 盈亏平衡 ACoS (Break-even Margin)',
-            min_value=10,
-            max_value=80,
-            value=30,
-            step=1,
-            help='您的产品净毛利率。当实际 ACoS 超过此数值时，广告即产生绝对亏损。',
-        )
-        global_margin_float = global_margin_pct / 100.0
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
 
-        st.divider()
+if not st.session_state['authenticated']:
+    _, center_col, _ = st.columns([1, 1.2, 1])
+    with center_col:
+        st.write('### 🔒 卖家受邀内测通道 (Private Alpha)')
+        st.caption('亚马逊 Sponsored Products 广告深度诊断与结构止损系统')
+        st.info('👋 本系统目前处于特邀内测阶段。请输入您的专属邀请码开启分析。')
 
-        ##
-        uploaded_file = st.file_uploader('📥 上传搜索词报告', type=['xlsx', 'csv'])
-
-    if uploaded_file is not None:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                raw_df = pd.read_csv(uploaded_file)
+        invite_code = st.text_input('内测邀请码 (Invite Code)', type='password')
+        if st.button('进入系统', use_container_width=True):
+            if invite_code.strip() == ALPHA_ACCESS_KEY:
+                st.session_state['authenticated'] = True
+                st.rerun()
             else:
-                raw_df = pd.read_excel(uploaded_file)
+                st.error('❌ 邀请码无效，请联系技术顾问获取访问权限。')
+    st.stop()
 
-            clean_df = AmazonSPSchema.validate_and_normalize(raw_df)
 
-            auditor = AmazonPPCAuditor(clean_df)
+# -------------------------------------------------------------
+# 🚀 AUTHENTICATED APP WORKFLOW
+# -------------------------------------------------------------
+with st.sidebar:
+    st.write('### ⚙️ 财务配置 (Financial)')
+    global_margin_pct = st.slider(
+        '🎯 盈亏平衡 ACoS (Break-even Margin)',
+        min_value=10,
+        max_value=80,
+        value=30,
+        step=1,
+        help='您的产品净毛利率。当实际 ACoS 超过此数值时，广告即产生绝对亏损。',
+    )
+    global_margin_float = global_margin_pct / 100.0
 
-            excel_data = generate_excel_report(auditor, global_margin_float)
+    st.divider()
+    uploaded_file = st.file_uploader(
+        '📥 上传搜索词报告 (Excel / CSV)',
+        type=['xlsx', 'csv'],
+        help='支持从亚马逊后台直接下载的中文或英文 SP Search Term Report',
+    )
 
-            st.sidebar.divider()
-            st.sidebar.download_button(
-                label='📥 导出完整审计报告 (Export Excel)',
-                data=excel_data,
-                file_name='Amazon_PPC_Audit_Report.xlsx',
-                mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                use_container_width=True,
-            )
+if uploaded_file is not None:
+    try:
+        # Streamlit file uploader returns an in-memory buffer
+        if uploaded_file.name.endswith('.csv'):
+            raw_df = pd.read_csv(uploaded_file)
+        else:
+            raw_df = pd.read_excel(uploaded_file)
 
-            render_audit_dashboard(auditor, global_margin=global_margin_float)
+        # 1. Gatekeeper normalization
+        clean_df = AmazonSPSchema.validate_and_normalize(raw_df)
 
-        except SchemaValidationError as e:
-            # Graceful, layman-friendly UI failure
-            st.error(f'❌ **报表格式错误 (Format Error):** {str(e)}')
-            st.info(
-                '💡 **排查指南:**\n'
-                '1. 请确保您上传的是 **SP 搜索词报告 (Sponsored Products Search Term Report)**，而不是 Sponsored Brands (SB) 或其他报告。\n'
-                '2. 请确保您下载报表后没有手动删除任何列。\n'
-                '3. 当前系统仅支持**中文语言**的亚马逊后台报表。'
-            )
-            st.stop()  # Immediately halts Streamlit execution cleanly
+        # 2. Math engine processing
+        auditor = AmazonPPCAuditor(clean_df)
 
-        except Exception:
-            # Catch-all for catastrophic Pandas failures (e.g., completely corrupted file)
-            st.error('🚨 **文件读取失败:** 请确保上传的是标准的 Excel 或 CSV 文件。')
-            st.stop()
+        # 3. Excel report generator
+        excel_data = generate_excel_report(auditor, global_margin_float)
 
-    else:
-        # Use the wide main canvas to show a beautiful placeholder
-        st.title('📊 亚马逊 PPC 深度审计报告')
-        st.info('👈 请在左侧边栏上传您的广告报表以生成审计看板。')
+        st.sidebar.divider()
+        st.sidebar.download_button(
+            label='📥 导出完整审计报告 (Excel)',
+            data=excel_data,
+            file_name='Amazon_SP_PPC_Audit_Report.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            use_container_width=True,
+        )
+
+        # 4. Render UI
+        render_audit_dashboard(auditor, global_margin=global_margin_float)
+
+    except SchemaValidationError as e:
+        st.error(f'❌ **报表格式验证失败:** {str(e)}')
+        st.info(
+            '💡 **上传检查清单:**\n'
+            '1. 请确认文件属于 **Sponsored Products (SP)** 搜索词报告，而非品牌广告 (SB) 或展示广告 (SD)。\n'
+            '2. 报表从亚马逊后台导出后，请勿手动删除或更名数据列。\n'
+            '3. 系统原生支持中国站与海外站（中/英双语）原始报表。'
+        )
+    except Exception:
+        st.error('🚨 **系统处理异常:** 无法解析该报表，请确认文件内容未受损。')
 else:
-    st.error('🔒 访问被拒绝。请先登录。')
+    st.title('📊 亚马逊 SP 广告深度审计专家')
+    st.write('无需授权店铺 API，本地内存脱敏计算，帮助卖家精准定位无效点击与利润流失点。')
+
+    st.divider()
+    c1, c2, c3 = st.columns(3)
+    c1.markdown(
+        '#### 🛑 紧急止损清单\n'
+        '精准抓取只消耗不转化的无效词，以及多广告活动内部竞价冲突（自己抬高自己 CPC）的消耗点。'
+    )
+    c2.markdown(
+        '#### 💸 账户架构风险\n'
+        '结合您的保本利润率，揪出长期实际 ACoS 严重超标、正在吞噬净利润的结构性亏损广告活动。'
+    )
+    c3.markdown(
+        '#### 🚀 核心扩展机会\n'
+        '筛选出出单稳定、ACoS 低于保本线的黄金词，提供安全的词组剥离与精准裂变策略。'
+    )
+
+    st.info('👈 请在左侧边栏上传从亚马逊卖家中心导出的搜索词报表开始审计。')

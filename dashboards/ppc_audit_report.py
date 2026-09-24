@@ -5,6 +5,7 @@ import streamlit as st
 
 from backend.auditor.amazon_ppc_auditor import AmazonPPCAuditor
 from backend.schema import AmazonSPSchema, SchemaValidationError
+from backend.telemetry import insert_telemetry_row
 from ui.audit_dashboard import generate_excel_report, render_audit_dashboard
 
 # Enforce wide layout
@@ -14,6 +15,7 @@ st.set_page_config(
     layout='wide',
     initial_sidebar_state='expanded',
 )
+
 
 # Custom CSS to hide Streamlit watermarks and tighten header padding
 st.markdown(
@@ -30,6 +32,11 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+
+# --- Page View Tracking (Fires exactly once per session) ---
+if 'page_view_fired' not in st.session_state:
+    insert_telemetry_row('PAGE_VIEW')
+    st.session_state.page_view_fired = True
 
 # -------------------------------------------------------------
 # 🛡️ ALPHA ACCESS GATEKEEPER
@@ -129,13 +136,20 @@ if uploaded_file is not None:
         excel_data = generate_excel_report(auditor, global_margin_float)
 
         st.sidebar.divider()
-        st.sidebar.download_button(
+
+        export_clicked = st.sidebar.download_button(
             label='📥 导出完整审计报告 (Excel)',
             data=excel_data,
             file_name='Amazon_SP_PPC_Audit_Report.xlsx',
             mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             use_container_width=True,
         )
+
+        if export_clicked:
+            insert_telemetry_row(
+                event_type='ACTION_CLICK',
+                details=f'Exported Global Excel | Margin: {global_margin_pct}%',
+            )
 
         # 4. Render UI
         render_audit_dashboard(auditor, global_margin=global_margin_float)
@@ -150,6 +164,7 @@ if uploaded_file is not None:
         )
     # except Exception:
     #     st.error('🚨 **系统处理异常:** 无法解析该报表，请确认文件内容未受损。')
+
 else:
     st.title('📊 亚马逊 SP 广告深度审计专家')
     st.write('无需授权店铺 API，本地内存脱敏计算，帮助卖家精准定位无效点击与利润流失点。')

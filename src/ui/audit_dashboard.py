@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from backend.telemetry import insert_telemetry_row
 from ui.contract import UIContract
 
 
@@ -135,6 +136,32 @@ def render_audit_dashboard(auditor, global_margin: float):
                 use_container_width=True,
                 hide_index=True,
             )
+
+    # ---------------------------------------------------------
+    # 🚨 THE FEEDBACK ENGINE
+    # ---------------------------------------------------------
+    st.divider()
+    st.subheader('🗣️ 听听您的声音 (Product Feedback)')
+
+    sentiment = st.feedback('thumbs')
+
+    with st.form(key='user_feedback_form'):
+        user_thoughts = st.text_area(
+            '告诉我们您的需求 / Bug反馈：',
+            placeholder='例如：希望系统能针对「跑不出曝光的词」也给点建议...',
+            max_chars=500,
+        )
+
+        submit_btn = st.form_submit_button('🚀 提交反馈 (Submit)', use_container_width=True)
+
+        if submit_btn:
+            if sentiment is None and not user_thoughts.strip():
+                st.warning('⚠️ 请先点赞/踩，或者输入些文字再提交哦！')
+            else:
+                insert_telemetry_row(
+                    event_type='FEEDBACK', sentiment=sentiment, details=user_thoughts.strip()
+                )
+                st.success('✅ **收到！** 数据已同步至云端，感谢您的支持。')
 
     with tab2:
         st.subheader('💸 结构性亏损 (Operating Below Margin)')

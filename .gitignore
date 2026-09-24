@@ -16,3 +16,5 @@ wheels/
 notebooks
 *.ipynb
 
+# streamlit secrets
+.streamlit/secrets.toml

@@ -16,7 +16,6 @@ st.set_page_config(
 )
 
 # Custom CSS to hide Streamlit watermarks and tighten header padding
-# Custom CSS to hide Streamlit watermarks and tighten header padding
 st.markdown(
     """
     <style>
@@ -36,6 +35,9 @@ st.markdown(
 # 🛡️ ALPHA ACCESS GATEKEEPER
 # -------------------------------------------------------------
 ALPHA_ACCESS_KEY = os.environ.get('ALPHA_INVITE_CODE', 'SELLER2026')
+# Define our mathematically calculated safety limit (in Bytes)
+MAX_FILE_SIZE_MB = 15.0
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 if 'authenticated' not in st.session_state:
     st.session_state['authenticated'] = False
@@ -76,10 +78,24 @@ with st.sidebar:
     uploaded_file = st.file_uploader(
         '📥 上传搜索词报告 (Excel / CSV)',
         type=['xlsx', 'csv'],
-        help='支持从亚马逊后台直接下载的中文或英文 SP Search Term Report',
+        help=f'支持中/英文 SP Search Term Report。内测期间限制最大文件为 {MAX_FILE_SIZE_MB}MB。',
     )
 
 if uploaded_file is not None:
+    # 🚨 THE CIRCUIT BREAKER
+    file_size = uploaded_file.size
+
+    if file_size > MAX_FILE_SIZE_BYTES:
+        actual_mb = file_size / (1024 * 1024)
+        st.error(f'🛑 **文件过大 ({actual_mb:.1f} MB)**')
+        st.warning(
+            f'为了保证 Alpha 内测期间服务器的计算稳定性，当前系统最高支持 **{MAX_FILE_SIZE_MB} MB** 的报表。\n\n'
+            '**建议解决方案：**\n'
+            '1. 在亚马逊后台下载报表时，将时间跨度缩短至 14-30 天。\n'
+            '2. 仅保留您想要诊断的核心广告活动，删除无关行后再上传。'
+        )
+        st.stop()  # Halts execution instantly, protecting server memory
+
     try:
         # Streamlit file uploader returns an in-memory buffer
         if uploaded_file.name.endswith('.csv'):
@@ -89,6 +105,22 @@ if uploaded_file is not None:
 
         # 1. Gatekeeper normalization
         clean_df = AmazonSPSchema.validate_and_normalize(raw_df)
+
+        # ---------------------------------------------------------
+        # 🚨 NEW: Temporal Data Validation & Warning
+        # ---------------------------------------------------------
+        report_start = clean_df['start_date'].min()
+        report_end = clean_df['end_date'].max()
+        report_days = (report_end - report_start).days
+
+        if report_days < 14:
+            st.warning(
+                f'⚠️ **数据周期过短警告 ({report_days} 天):** 您上传的报表时间跨度不足 14 天。 '
+                '由于亚马逊广告存在 **7 天归因延迟 (Attribution Lag)**，近几天的点击可能已经产生订单，但尚未显示在报表中。'
+                '系统已自动下调时间阈值以强制输出分析结果，但建议您在处理「⏳ 长期不转化」词汇时保持谨慎，避免误杀。'
+            )
+        else:
+            st.info(f'📅 **报表周期:** {report_days} 天 (数据量充足，模型输出置信度高)')
 
         # 2. Math engine processing
         auditor = AmazonPPCAuditor(clean_df)
@@ -116,8 +148,8 @@ if uploaded_file is not None:
             '2. 报表从亚马逊后台导出后，请勿手动删除或更名数据列。\n'
             '3. 系统原生支持中国站与海外站（中/英双语）原始报表。'
         )
-    except Exception:
-        st.error('🚨 **系统处理异常:** 无法解析该报表，请确认文件内容未受损。')
+    # except Exception:
+    #     st.error('🚨 **系统处理异常:** 无法解析该报表，请确认文件内容未受损。')
 else:
     st.title('📊 亚马逊 SP 广告深度审计专家')
     st.write('无需授权店铺 API，本地内存脱敏计算，帮助卖家精准定位无效点击与利润流失点。')

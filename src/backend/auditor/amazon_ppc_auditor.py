@@ -65,68 +65,102 @@ class AmazonPPCAuditor:
 
     def extract_zero_sale_terms(
         self,
+        global_margin_float: float,
         click_multiplier: float = 1.5,
         absolute_click_floor: int = 5,
         ad_duration_day_threshold: int = 14,
         strategic_whitelist: list[str] = None,
     ) -> pd.DataFrame:
         """
-        Filters for zero-sale search terms utilizing a dynamic expected-value click threshold
-        based on the parent campaign's historical conversion rate.
+        Filters for zero-sale search terms using a dual-engine approach:
+        1. Slow Bleed: Dynamic click thresholds based on campaign CVR (with dynamic time fallback).
+        2. Fast Hemorrhage: Absolute spend velocity limits based on estimated AOV.
         """
         if self.df_micro.empty or self.df_mature.empty:
             return pd.DataFrame()
 
-        # 1. Establish the statistical baseline from mature data
+        # 1. Establish the statistical baseline and financial reality from mature data
         camp_stats = self.df_mature.groupby('campaign_name').agg(
-            total_clicks=('clicks', 'sum'), total_orders=('orders_7d', 'sum')
+            total_clicks=('clicks', 'sum'),
+            total_orders=('orders_7d', 'sum'),
+            total_sales=('total_sales_7d', 'sum'),  # Added to calculate AOV
         )
 
+        # CVR mapping
         camp_stats['cvr'] = np.where(
             camp_stats['total_clicks'] > 0,
             camp_stats['total_orders'] / camp_stats['total_clicks'],
-            0.05,  # Fallback assumption for cold-start campaigns
+            0.05,  # Fallback for cold-start
         )
 
-        # 2. Slice a working copy to avoid mutating the class state
+        # AOV mapping (with global account-level fallback for campaigns with 0 orders)
+        global_aov = self.df_mature['total_sales_7d'].sum() / max(
+            self.df_mature['orders_7d'].sum(), 1
+        )
+        if global_aov == 0:
+            global_aov = 30.0  # Ultimate fallback if entire account has 0 sales
+
+        camp_stats['aov'] = np.where(
+            camp_stats['total_orders'] > 0,
+            camp_stats['total_sales'] / camp_stats['total_orders'],
+            global_aov,
+        )
+
+        # 2. Slice a working copy
         df_working = self.df_micro.copy()
 
-        # 3. Map CVR and compute the dynamic threshold parameter
+        # 3. Map limits to the micro data
         mapped_cvr = df_working['campaign_name'].map(camp_stats['cvr']).fillna(0.05)
+        mapped_aov = df_working['campaign_name'].map(camp_stats['aov']).fillna(global_aov)
 
         df_working['dynamic_click_threshold'] = np.maximum(
             np.ceil((1.0 / mapped_cvr) * click_multiplier), absolute_click_floor
         )
 
-        # 4. Clean the whitelist for robust matching
-        whitelist = [str(term).strip().lower() for term in (strategic_whitelist or [])]
-        df_working['clean_term'] = df_working['customer_search_term'].str.strip().str.lower()
+        # 4. Catastrophic Spend Limit Math
+        # Break-even CPA = AOV * Margin. We flag spend exceeding 2x this limit.
+        df_working['catastrophic_limit'] = mapped_aov * global_margin_float * 2.0
 
-        # 5. Apply the multi-condition mathematical mask
-        mask = (
+        # 5. The Dynamic Time Fallback
+        max_dataset_duration = df_working['ad_duration_day'].max()
+        if pd.isna(max_dataset_duration):
+            max_dataset_duration = 0
+        applied_duration_threshold = min(ad_duration_day_threshold, max_dataset_duration)
+
+        # 6. Apply the Dual-Condition Mask
+        mask_slow_bleed = (
             (df_working['orders_7d'] == 0)
             & (df_working['clicks'] >= df_working['dynamic_click_threshold'])
-            & (df_working['ad_duration_day'] >= ad_duration_day_threshold)
+            & (df_working['ad_duration_day'] >= applied_duration_threshold)
         )
 
-        bleeding_df = df_working[mask].copy()
+        mask_fast_bleed = (df_working['orders_7d'] == 0) & (
+            df_working['spend'] >= df_working['catastrophic_limit']
+        )
+
+        bleeding_df = df_working[mask_slow_bleed | mask_fast_bleed].copy()
 
         if bleeding_df.empty:
             return bleeding_df.drop(
-                columns=['clean_term', 'dynamic_click_threshold'], errors='ignore'
+                columns=['dynamic_click_threshold', 'catastrophic_limit'], errors='ignore'
             )
 
-        # 6. Tag strategic keywords vs actionable bleeders
+        # 7. Clean Whitelist and Tag Action
+        whitelist = [str(term).strip().lower() for term in (strategic_whitelist or [])]
+        bleeding_df['clean_term'] = bleeding_df['customer_search_term'].str.strip().str.lower()
+
         bleeding_df['audit_action'] = np.where(
             bleeding_df['clean_term'].isin(whitelist),
             '战略保留 (Strategic Hold)',
-            '精准否定 (Negative Exact)',
+            np.where(
+                bleeding_df['spend'] >= bleeding_df['catastrophic_limit'],
+                '🚨 极速消耗 (High Velocity Spend)',
+                '⏳ 长期不转化 (Chronic Non-Converter)',
+            ),
         )
 
-        return (
-            bleeding_df.sort_values(by=['audit_action', 'spend'], ascending=[True, False]).drop(
-                columns=['clean_term']
-            )  # Keep dynamic_click_threshold for UI transparency
+        return bleeding_df.sort_values(by=['audit_action', 'spend'], ascending=[True, False]).drop(
+            columns=['clean_term']
         )
 
     def extract_top_performing_terms(
@@ -291,7 +325,7 @@ class AmazonPPCAuditor:
         overlap_df['status'] = np.where(
             overlap_df['efficiency_rank'] == 1,
             '优势词 (Winner)',
-            '劣势词，建议暂停 (Loser - Consider Pausing)',
+            '劣势词，建议调整 (Loser - Consider Adjusting)',
         )
 
         return {

@@ -11,12 +11,10 @@ def render_audit_dashboard(auditor, global_margin: float):
     st.title('📊 亚马逊 SP 广告深度审计 (Sponsored Products)')
     st.caption('基于微观广告组级别的数据聚合，为您精准定位利润泄漏点与扩张机会。')
 
-    # Fetch Data
-    df_bleeders = auditor.extract_zero_sale_terms()
+    # Compute results
+    df_bleeders = auditor.extract_zero_sale_terms(global_margin_float=global_margin)
     cannibal_data = auditor.detect_match_type_cannibalization()
     fragility_data = auditor.assess_portfolio_fragility()
-
-    # Ingest global_margin here
     breakeven_data = auditor.evaluate_campaign_breakeven_health(break_even_acos=global_margin)
     df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)
 
@@ -60,12 +58,13 @@ def render_audit_dashboard(auditor, global_margin: float):
         # --- White-Box UI: The Accordion ---
         with st.expander('💡 算法原理解析 (How We Calculate This)'):
             st.markdown("""
-            **1. 智能点击止损 (该给一个词多少次机会？):**
-            我们不搞一刀切（比如死规定15次点击没出单就全关掉）。
-            系统会先算一算，你平时的广告大概**几次点击能卖出一单**？比如你平时平均 10 次点击出一单，如果有个词被点了 15 次甚至更多，却连一单都没出，我们才会判定它在白白浪费你的钱，建议立刻拉黑（精准否定）。
+            **1. 🩸 无效点击止损：双引擎防御机制**
+            传统的软件只会死板地规定“大于15次点击不出单就关闭”，这非常容易误判。我们采用了更贴近商业逻辑的双引擎算法：
+            * **🚨 极速消耗 (流血太快):** 系统结合了您的客单价与左侧设置的**保本利润率**，算出了极限获客成本。如果某个词一单没出，但花费已经飙升超过了保本线的 **2 倍**，系统会无视天数立刻预警。（*商业逻辑：亏得太快，根本等不起亚马逊的数据延迟！*）
+            * **⏳ 长期不转化 (慢性放血):** 对于花钱不快的词，系统会分析您平时的转化率。比如您平时 10 次点击能卖出一单，如果有个词被点了 15 次甚至更多却依然挂零，系统才会判定它在白嫖流量，建议立刻精准否定。
             
-            **2. 避免自己人打自己人 (流量内卷):**
-            有时候，你的自动广告、广泛匹配都在抢同一个搜索词。这其实是在**自己抬高自己的广告费 (CPC)**。系统会帮你找出谁表现最好，把多余的关掉，把钱花在刀刃上。
+            **2. ⚔️ 流量内卷：避免“自己人打自己人”**
+            有时候，您的自动广告、广泛匹配和词组匹配都在同时竞价抢夺同一个搜索词。这会导致您的多个广告组互相竞争，**自己抬高自己的单次点击费 (CPC)**。系统会帮您揪出这些“同室操戈”的词，指导您暂停多余的匹配，把钱花在转化率最高的那一个上。
             """)
 
         st.write('点击量过高但从未产生订单的搜索词，建议立即添加为**精准否定 (Negative Exact)**。')
@@ -103,6 +102,11 @@ def render_audit_dashboard(auditor, global_margin: float):
                 use_container_width=True,
                 hide_index=True,
             )
+        else:
+            st.success(
+                '🎉 **太棒了！** 您的报表中没有发现严重超标的纯消耗词，预算拦截做得非常出色！'
+            )
+            st.balloons()
 
         st.subheader('⚔️ 流量互斥与内卷 (Match-Type Cannibalization)')
         st.write('多个广告活动正在为同一个搜索词竞价，导致您自己在抬高自己的CPC。')
@@ -218,6 +222,11 @@ def render_audit_dashboard(auditor, global_margin: float):
                 use_container_width=True,
                 hide_index=True,
             )
+        else:
+            st.success(
+                f'📈 **盈利健康！** 在 {global_margin * 100:.0f}% 的保本利润率下，没有发现长期处于绝对亏损状态的广告组。'
+            )
+            st.balloons()  # Optional: Add a subtle celebration animation for a perfect account
 
     with tab3:
         st.subheader('🌟 黄金扩展词 (Top Performers)')
@@ -282,7 +291,7 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
     Compiles the entire audit state into a localized, multi-sheet Excel binary buffer.
     """
     # 1. Fetch the raw data
-    df_bleeders = auditor.extract_zero_sale_terms()
+    df_bleeders = auditor.extract_zero_sale_terms(global_margin_float=global_margin)
     cannibal_data = auditor.detect_match_type_cannibalization()
     breakeven_data = auditor.evaluate_campaign_breakeven_health(break_even_acos=global_margin)
     df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)

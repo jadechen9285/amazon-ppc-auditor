@@ -22,6 +22,6 @@ Provide your response in the following structure:
 - Start with a one-sentence rephrasing my questions in your own thought to make sure you understand the question
 - Draw an ASCII diagram showing the thought process
 - Show the math notation
-- Show a Python implementation for the asked questions (if possible)
+- Show a Python implementation, where it MUST it entire complete scripts, and NEVER show partial fix, for the asked questions (if possible)
 - Walke through the provided code briefly (suitable for Sr DS)
 - Explain potential pitfall and edge cases 

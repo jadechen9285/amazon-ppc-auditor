@@ -4,333 +4,316 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from backend.telemetry import insert_telemetry_row
+from backend.telemetry import insert_telemetry_row  # 🚀 IMPORT REQUIRED FOR FEEDBACK
 from ui.contract import UIContract
+from ui.i18n import t
 
 
 def render_audit_dashboard(auditor, global_margin: float):
-    st.title('📊 亚马逊 SP 广告深度审计 (Sponsored Products)')
-    st.caption('基于微观广告组级别的数据聚合，为您精准定位利润泄漏点与扩张机会。')
+    """Main entry point for rendering the audit UI."""
+    st.title(t('dashboard_title'))
+    st.caption(t('dashboard_caption'))
 
-    # Compute results
+    # 1. Compute all results
     df_bleeders = auditor.extract_zero_sale_terms(global_margin_float=global_margin)
     cannibal_data = auditor.detect_match_type_cannibalization()
     fragility_data = auditor.assess_portfolio_fragility()
     breakeven_data = auditor.evaluate_campaign_breakeven_health(break_even_acos=global_margin)
     df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)
 
-    # Hero Metrics
+    # 2. Render Hero Metrics Layer
+    _render_hero_metrics(df_bleeders, cannibal_data, breakeven_data, fragility_data, global_margin)
+
+    st.divider()
+
+    # 3. Render Tabbed Views
+    tab1, tab2, tab3 = st.tabs([t('tab_bleeders'), t('tab_loss'), t('tab_winners')])
+
+    with tab1:
+        _render_tab_bleeders(df_bleeders, cannibal_data)
+    with tab2:
+        _render_tab_structural_loss(breakeven_data, global_margin)
+    with tab3:
+        _render_tab_winners(df_winners, global_margin)
+
+    # 4. Render Feedback Engine at the bottom of the page
+    _render_feedback_section()
+
+
+# -------------------------------------------------------------
+# 🧩 MODULAR RENDER FUNCTIONS
+# -------------------------------------------------------------
+
+
+def _render_hero_metrics(df_bleeders, cannibal_data, breakeven_data, fragility_data, global_margin):
     total_waste = df_bleeders['spend'].sum() if not df_bleeders.empty else 0.0
     total_waste += cannibal_data.get('total_cannibalized_spend', 0.0)
 
     col1, col2, col3 = st.columns(3)
     col1.metric(
-        label='🚨 预估可挽回损失 (30天)',
+        label=t('hero_waste_label'),
         value=f'${total_waste:,.2f}',
-        delta='- 立即操作',
+        delta=t('hero_waste_delta'),
         delta_color='inverse',
-        help='计算逻辑：[无转化无效花费] + [流量互斥与内卷]。这部分预算完全未产生转化或属于自我消耗，可通过执行下方表格的操作立即止损。',
+        help=t('hero_waste_help'),
     )
 
     col2.metric(
-        label='📉 长期亏损广告活动',
-        value=f'{breakeven_data.get("unprofitable_campaign_count", 0)} 个',
-        delta='- 结构性亏损',
+        label=t('hero_loss_label'),
+        value=f'{breakeven_data.get("unprofitable_campaign_count", 0)}',
+        delta=t('hero_loss_delta'),
         delta_color='inverse',
-        help=f'计算逻辑：在归因周期内，实际 ACoS 持续高于您设定的全局盈亏平衡线（{global_margin * 100:.0f}%）的广告活动数量。这些活动正在吞噬其他优质活动的净利润。',
+        help=t('hero_loss_help', margin=global_margin * 100),
     )
 
-    risk_status = '⚠️ 极高风险' if fragility_data.get('is_fragile') else '✅ 健康'
+    is_fragile = fragility_data.get('is_fragile')
+    risk_status = t('hero_risk_status_high') if is_fragile else t('hero_risk_status_ok')
+
     col3.metric(
-        label='🏗️ 核心词流量集中度',
+        label=t('hero_risk_label'),
         value=f'{fragility_data.get("concentration_ratio", 0) * 100:.1f}%',
         delta=risk_status,
         delta_color='off',
-        help='计算逻辑：账户花费前 10 名的搜索词占总花费的比例。若比例过高（>40%），说明账户过度依赖极少数词，极易因竞争对手提价或 A9 算法波动导致整体单量崩盘。',
+        help=t('hero_risk_help'),
     )
 
+
+def _render_tab_bleeders(df_bleeders, cannibal_data):
+    st.subheader(t('tab1_subheader1'))
+
+    with st.expander(t('tab1_expander_title')):
+        st.markdown(t('tab1_expander_content'))
+
+    st.write(t('tab1_advice'))
+
+    if not df_bleeders.empty:
+        st.dataframe(
+            df_bleeders[
+                [
+                    'audit_action',
+                    'campaign_name',
+                    'ad_group_name',
+                    'match_type',
+                    'targeting',
+                    'customer_search_term',
+                    'clicks',
+                    'dynamic_click_threshold',
+                    'spend',
+                ]
+            ],
+            column_config={
+                'audit_action': UIContract.get_label('audit_action'),
+                'campaign_name': UIContract.get_label('campaign_name'),
+                'ad_group_name': UIContract.get_label('ad_group_name'),
+                'match_type': UIContract.get_label('match_type'),
+                'targeting': UIContract.get_label('targeting'),
+                'customer_search_term': UIContract.get_label('customer_search_term'),
+                'clicks': st.column_config.NumberColumn(UIContract.get_label('clicks')),
+                'dynamic_click_threshold': st.column_config.NumberColumn(
+                    UIContract.get_label('dynamic_click_threshold')
+                ),
+                'spend': st.column_config.NumberColumn(
+                    UIContract.get_label('spend'), format='$%.2f'
+                ),
+            },
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.success(t('tab1_success'))
+        st.balloons()
+
+    st.subheader(t('tab1_subheader2'))
+    st.write(t('tab1_advice2'))
+
+    if not cannibal_data['overlap_df'].empty:
+        st.dataframe(
+            cannibal_data['overlap_df'][
+                [
+                    'status',
+                    'customer_search_term',
+                    'campaign_name',
+                    'match_type',
+                    'targeting',
+                    'spend',
+                ]
+            ],
+            column_config={
+                'status': UIContract.get_label('status'),
+                'customer_search_term': UIContract.get_label('customer_search_term'),
+                'campaign_name': UIContract.get_label('campaign_name'),
+                'match_type': UIContract.get_label('match_type'),
+                'targeting': UIContract.get_label('targeting'),
+                'spend': st.column_config.NumberColumn(
+                    UIContract.get_label('spend'), format='$%.2f'
+                ),
+            },
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+def _render_tab_structural_loss(breakeven_data, global_margin):
+    st.subheader(t('tab2_subheader'))
+
+    with st.expander(t('tab1_expander_title')):
+        st.markdown(t('tab2_expander_content'))
+
+    st.write(t('tab2_desc', days=breakeven_data.get('observation_window_days', 14)))
+
+    df_loss = breakeven_data['unprofitable_campaigns_df']
+    if not df_loss.empty:
+        st.write(t('tab2_chart_title'))
+        st.caption(t('tab2_chart_caption'))
+
+        excel_map = UIContract.get_excel_map()
+        chart_view = df_loss[['total_sales', 'total_spend', 'capital_lost']].copy()
+        chart_map = {
+            'total_sales': excel_map['total_sales'],
+            'total_spend': excel_map['total_spend'],
+            'capital_lost': excel_map['capital_lost'],
+        }
+        chart_view = chart_view.rename(columns=chart_map)
+
+        st.scatter_chart(
+            chart_view,
+            x=excel_map['total_sales'],
+            y=excel_map['total_spend'],
+            size=excel_map['capital_lost'],
+            color='#ff4b4b',
+            height=350,
+        )
+
+        df_loss_view = df_loss.copy()
+        df_loss_view['realized_acos'] = np.where(
+            np.isinf(df_loss_view['realized_acos']), 0.0, df_loss_view['realized_acos'] * 100
+        )
+
+        st.dataframe(
+            df_loss_view[
+                [
+                    'consultative_action',
+                    'campaign_name',
+                    'total_spend',
+                    'total_sales',
+                    'total_orders',
+                    'realized_acos',
+                    'allowable_spend',
+                    'capital_lost',
+                ]
+            ],
+            column_config={
+                'consultative_action': UIContract.get_label('consultative_action'),
+                'campaign_name': UIContract.get_label('campaign_name'),
+                'total_spend': st.column_config.NumberColumn(
+                    UIContract.get_label('total_spend'), format='$%.2f'
+                ),
+                'total_sales': st.column_config.NumberColumn(
+                    UIContract.get_label('total_sales'), format='$%.2f'
+                ),
+                'total_orders': st.column_config.NumberColumn(UIContract.get_label('total_orders')),
+                'realized_acos': st.column_config.NumberColumn(
+                    UIContract.get_label('realized_acos'), format='%.2f%%'
+                ),
+                'allowable_spend': st.column_config.NumberColumn(
+                    UIContract.get_label('allowable_spend'), format='$%.2f'
+                ),
+                'capital_lost': st.column_config.NumberColumn(
+                    UIContract.get_label('capital_lost'), format='$%.2f'
+                ),
+            },
+            use_container_width=True,
+            hide_index=True,
+        )
+    else:
+        st.success(t('tab2_success', margin=global_margin * 100))
+        st.balloons()
+
+
+def _render_tab_winners(df_winners, global_margin):
+    st.subheader(t('tab3_subheader'))
+
+    with st.expander(t('tab1_expander_title')):
+        st.markdown(t('tab3_expander_content'))
+
+    st.warning(t('tab3_warning'))
+    st.write(t('tab3_desc'))
+
+    if not df_winners.empty:
+        df_winners_view = df_winners.copy()
+        df_winners_view['acos'] = df_winners_view['acos'] * 100
+
+        st.dataframe(
+            df_winners_view[
+                [
+                    'audit_action',
+                    'campaign_name',
+                    'match_type',
+                    'targeting',
+                    'customer_search_term',
+                    'orders_7d',
+                    'acos',
+                    'gross_profit',
+                ]
+            ],
+            column_config={
+                'audit_action': UIContract.get_label('audit_action'),
+                'campaign_name': UIContract.get_label('campaign_name'),
+                'match_type': UIContract.get_label('match_type'),
+                'targeting': UIContract.get_label('targeting'),
+                'customer_search_term': UIContract.get_label('customer_search_term'),
+                'orders_7d': st.column_config.NumberColumn(UIContract.get_label('orders_7d')),
+                'acos': st.column_config.NumberColumn(
+                    UIContract.get_label('acos'), format='%.2f%%'
+                ),
+                'gross_profit': st.column_config.NumberColumn(
+                    UIContract.get_label('gross_profit'), format='$%.2f'
+                ),
+            },
+            use_container_width=True,
+            hide_index=True,
+        )
+
+
+def _render_feedback_section():
+    """Renders the product feedback form at the bottom of the main dashboard."""
     st.divider()
-
-    tab1, tab2, tab3 = st.tabs(['🛑 紧急止损清单', '💸 账户架构风险', '🚀 核心扩展机会'])
-
-    with tab1:
-        st.subheader('🩸 无转化无效花费 (Zero-Sale Bleeders)')
-
-        # --- White-Box UI: The Accordion ---
-        with st.expander('💡 算法原理解析 (How We Calculate This)'):
-            st.markdown("""
-            **1. 🩸 无效点击止损：双引擎防御机制**
-            传统的软件只会死板地规定“大于15次点击不出单就关闭”，这非常容易误判。我们采用了更贴近商业逻辑的双引擎算法：
-            * **🚨 极速消耗 (流血太快):** 系统结合了您的客单价与左侧设置的**保本利润率**，算出了极限获客成本。如果某个词一单没出，但花费已经飙升超过了保本线的 **2 倍**，系统会无视天数立刻预警。（*商业逻辑：亏得太快，根本等不起亚马逊的数据延迟！*）
-            * **⏳ 长期不转化 (慢性放血):** 对于花钱不快的词，系统会分析您平时的转化率。比如您平时 10 次点击能卖出一单，如果有个词被点了 15 次甚至更多却依然挂零，系统才会判定它在白嫖流量，建议立刻精准否定。
-            
-            **2. ⚔️ 流量内卷：避免“自己人打自己人”**
-            有时候，您的自动广告、广泛匹配和词组匹配都在同时竞价抢夺同一个搜索词。这会导致您的多个广告组互相竞争，**自己抬高自己的单次点击费 (CPC)**。系统会帮您揪出这些“同室操戈”的词，指导您暂停多余的匹配，把钱花在转化率最高的那一个上。
-            """)
-
-        st.write('点击量过高但从未产生订单的搜索词，建议立即添加为**精准否定 (Negative Exact)**。')
-
-        if not df_bleeders.empty:
-            st.dataframe(
-                df_bleeders[
-                    [
-                        'audit_action',
-                        'campaign_name',
-                        'ad_group_name',
-                        'match_type',
-                        'targeting',
-                        'customer_search_term',
-                        'clicks',
-                        'dynamic_click_threshold',
-                        'spend',
-                    ]
-                ],
-                column_config={
-                    'audit_action': UIContract.get_label('audit_action'),
-                    'campaign_name': UIContract.get_label('campaign_name'),
-                    'ad_group_name': UIContract.get_label('ad_group_name'),
-                    'match_type': UIContract.get_label('match_type'),
-                    'targeting': UIContract.get_label('targeting'),
-                    'customer_search_term': UIContract.get_label('customer_search_term'),
-                    'clicks': st.column_config.NumberColumn(UIContract.get_label('clicks')),
-                    'dynamic_click_threshold': st.column_config.NumberColumn(
-                        UIContract.get_label('dynamic_click_threshold')
-                    ),
-                    'spend': st.column_config.NumberColumn(
-                        UIContract.get_label('spend'), format='$%.2f'
-                    ),
-                },
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.success(
-                '🎉 **太棒了！** 您的报表中没有发现严重超标的纯消耗词，预算拦截做得非常出色！'
-            )
-            st.balloons()
-
-        st.subheader('⚔️ 流量互斥与内卷 (Match-Type Cannibalization)')
-        st.write('多个广告活动正在为同一个搜索词竞价，导致您自己在抬高自己的CPC。')
-        if not cannibal_data['overlap_df'].empty:
-            st.dataframe(
-                cannibal_data['overlap_df'][
-                    [
-                        'status',
-                        'customer_search_term',
-                        'campaign_name',
-                        'match_type',
-                        'targeting',
-                        'spend',
-                    ]
-                ],
-                column_config={
-                    'status': UIContract.get_label('status'),
-                    'customer_search_term': UIContract.get_label('customer_search_term'),
-                    'campaign_name': UIContract.get_label('campaign_name'),
-                    'match_type': UIContract.get_label('match_type'),
-                    'targeting': UIContract.get_label('targeting'),
-                    'spend': st.column_config.NumberColumn(
-                        UIContract.get_label('spend'), format='$%.2f'
-                    ),
-                },
-                use_container_width=True,
-                hide_index=True,
-            )
-
-    # ---------------------------------------------------------
-    # 🚨 THE FEEDBACK ENGINE
-    # ---------------------------------------------------------
-    st.divider()
-    st.subheader('🗣️ 听听您的声音 (Product Feedback)')
+    st.subheader(t('feedback_expander'))
 
     sentiment = st.feedback('thumbs')
 
-    with st.form(key='user_feedback_form'):
+    with st.form(key='main_feedback_form'):
         user_thoughts = st.text_area(
-            '告诉我们您的需求 / Bug反馈：',
-            placeholder='例如：希望系统能针对「跑不出曝光的词」也给点建议...',
-            max_chars=500,
+            t('feedback_prompt'), placeholder=t('feedback_placeholder'), max_chars=500
         )
-
-        submit_btn = st.form_submit_button('🚀 提交反馈 (Submit)', use_container_width=True)
+        submit_btn = st.form_submit_button(t('feedback_submit'), use_container_width=True)
 
         if submit_btn:
             if sentiment is None and not user_thoughts.strip():
-                st.warning('⚠️ 请先点赞/踩，或者输入些文字再提交哦！')
+                st.warning(t('feedback_warning'))
             else:
                 insert_telemetry_row(
                     event_type='FEEDBACK', sentiment=sentiment, details=user_thoughts.strip()
                 )
-                st.success('✅ **收到！** 数据已同步至云端，感谢您的支持。')
+                st.success(t('feedback_success'))
 
-    with tab2:
-        st.subheader('💸 结构性亏损 (Operating Below Margin)')
 
-        # --- White-Box UI: The Accordion ---
-        with st.expander('💡 算法原理解析 (How We Calculate This)'):
-            st.markdown("""
-            **怎么算出“纯利润净亏损”的？**
-            这不是单纯看你花了多少广告费，而是结合了你设定的**毛利率 (Break-even Margin)** 算出来的一笔结结实实的经济账。
-            
-            **举个例子：**
-            如果你设定的毛利是 30%，当你卖了 $100 时，按理说广告费绝不能超过 $30。如果你实际花了 $50 广告费，那么多出来的这 $20，就是**直接从你口袋里掏走的净亏损**。这个页面帮你一眼揪出这些正在抽干你现金流的“吞金兽”。
-            """)
-
-        st.write(
-            f'在成熟归因期（{breakeven_data.get("observation_window_days")}天）内，实际ACoS严重超出盈亏平衡线的广告活动。'
-        )
-
-        df_loss = breakeven_data['unprofitable_campaigns_df']
-        if not df_loss.empty:
-            st.write('##### 亏损分布矩阵 (Loss Distribution Matrix)')
-            st.caption('气泡大小代表净亏损金额。位于左上方的广告活动正在消耗大量预算却鲜有产出。')
-
-            # Fetch the Excel map to leverage the automatic "($)" suffixes for the chart axes
-            excel_map = UIContract.get_excel_map()
-
-            chart_view = df_loss[['total_sales', 'total_spend', 'capital_lost']].copy()
-            chart_map = {
-                'total_sales': excel_map['total_sales'],
-                'total_spend': excel_map['total_spend'],
-                'capital_lost': excel_map['capital_lost'],
-            }
-            chart_view = chart_view.rename(columns=chart_map)
-
-            st.scatter_chart(
-                chart_view,
-                x=excel_map['total_sales'],
-                y=excel_map['total_spend'],
-                size=excel_map['capital_lost'],
-                color='#ff4b4b',
-                height=350,
-            )
-
-            # --- THE VIEW LAYER TRANSFORMATION ---
-            df_loss_view = df_loss.copy()
-            df_loss_view['realized_acos'] = np.where(
-                np.isinf(df_loss_view['realized_acos']), 0.0, df_loss_view['realized_acos'] * 100
-            )
-
-            columns_to_display = [
-                'consultative_action',
-                'campaign_name',
-                'total_spend',
-                'total_sales',
-                'total_orders',
-                'realized_acos',
-                'allowable_spend',
-                'capital_lost',
-            ]
-
-            st.dataframe(
-                df_loss_view[columns_to_display],
-                column_config={
-                    'consultative_action': UIContract.get_label('consultative_action'),
-                    'campaign_name': UIContract.get_label('campaign_name'),
-                    'total_spend': st.column_config.NumberColumn(
-                        UIContract.get_label('total_spend'), format='$%.2f'
-                    ),
-                    'total_sales': st.column_config.NumberColumn(
-                        UIContract.get_label('total_sales'), format='$%.2f'
-                    ),
-                    'total_orders': st.column_config.NumberColumn(
-                        UIContract.get_label('total_orders')
-                    ),
-                    'realized_acos': st.column_config.NumberColumn(
-                        UIContract.get_label('realized_acos'), format='%.2f%%'
-                    ),
-                    'allowable_spend': st.column_config.NumberColumn(
-                        UIContract.get_label('allowable_spend'), format='$%.2f'
-                    ),
-                    'capital_lost': st.column_config.NumberColumn(
-                        UIContract.get_label('capital_lost'), format='$%.2f'
-                    ),
-                },
-                use_container_width=True,
-                hide_index=True,
-            )
-        else:
-            st.success(
-                f'📈 **盈利健康！** 在 {global_margin * 100:.0f}% 的保本利润率下，没有发现长期处于绝对亏损状态的广告组。'
-            )
-            st.balloons()  # Optional: Add a subtle celebration animation for a perfect account
-
-    with tab3:
-        st.subheader('🌟 黄金扩展词 (Top Performers)')
-
-        # --- White-Box UI: The Accordion ---
-        with st.expander('💡 算法原理解析 (How We Calculate This)'):
-            st.markdown("""
-            **如何安全地把好词放大？**
-            系统帮你挑出了既能稳定出单，又不会让你亏钱的“神仙词”。
-            
-            - **如果它已经是精准匹配：** 说明定位很准，建议直接加点竞价或预算，让它跑得更好。
-            - **如果它是从自动或广泛广告里跑出来的：** 建议把它单独拿出来，建一个新的“精准广告组”。给它专属的预算去抢占搜索页顶部，同时这么做也不会破坏你原来广告组的节奏。
-            """)
-
-        st.warning(
-            '⚠️ **A9 迁移规则 (Peel & Stick):** 提取新词时**切勿直接暂停原词**。应先降低原词竞价 (30%-50%)，待新组观察 7-14 天稳定出单后，再否定原词，以免历史权重清零。'
-        )
-
-        st.write('高转化且ACoS低于盈亏平衡线的优质词，根据其当前匹配类型执行不同扩量策略。')
-
-        df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)
-
-        if not df_winners.empty:
-            # --- THE VIEW LAYER TRANSFORMATION ---
-            df_winners_view = df_winners.copy()
-            df_winners_view['acos'] = df_winners_view['acos'] * 100
-
-            st.dataframe(
-                df_winners_view[
-                    [
-                        'audit_action',
-                        'campaign_name',
-                        'match_type',
-                        'targeting',
-                        'customer_search_term',
-                        'orders_7d',
-                        'acos',
-                        'gross_profit',
-                    ]
-                ],
-                column_config={
-                    'audit_action': UIContract.get_label('audit_action'),
-                    'campaign_name': UIContract.get_label('campaign_name'),
-                    'match_type': UIContract.get_label('match_type'),
-                    'targeting': UIContract.get_label('targeting'),
-                    'customer_search_term': UIContract.get_label('customer_search_term'),
-                    'orders_7d': st.column_config.NumberColumn(UIContract.get_label('orders_7d')),
-                    'acos': st.column_config.NumberColumn(
-                        UIContract.get_label('acos'), format='%.2f%%'
-                    ),
-                    'gross_profit': st.column_config.NumberColumn(
-                        UIContract.get_label('gross_profit'), format='$%.2f'
-                    ),
-                },
-                use_container_width=True,
-                hide_index=True,
-            )
+# -------------------------------------------------------------
+# 📄 EXCEL EXPORT ENGINE
+# -------------------------------------------------------------
 
 
 def generate_excel_report(auditor, global_margin: float) -> bytes:
-    """
-    Compiles the entire audit state into a localized, multi-sheet Excel binary buffer.
-    """
-    # 1. Fetch the raw data
+    """Compiles the audit into a multi-sheet Excel binary buffer."""
     df_bleeders = auditor.extract_zero_sale_terms(global_margin_float=global_margin)
     cannibal_data = auditor.detect_match_type_cannibalization()
     breakeven_data = auditor.evaluate_campaign_breakeven_health(break_even_acos=global_margin)
     df_winners = auditor.extract_top_performing_terms(break_even_acos=global_margin)
 
-    # 2. Extract the automated Excel Transformation Matrix
     localization_map = UIContract.get_excel_map()
-
-    # 3. Initialize the RAM Buffer and Excel Writer
     buffer = io.BytesIO()
 
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-        # Sheet 1: Bleeders
         if not df_bleeders.empty:
             view = df_bleeders[
                 [
@@ -346,10 +329,9 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                 ]
             ].copy()
             view.rename(columns=localization_map).to_excel(
-                writer, sheet_name='紧急止损 (Bleeders)', index=False
+                writer, sheet_name=t('sheet_bleeders', default='Bleeders'), index=False
             )
 
-        # Sheet 2: Cannibalization
         if not cannibal_data['overlap_df'].empty:
             view = cannibal_data['overlap_df'][
                 [
@@ -362,10 +344,9 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                 ]
             ].copy()
             view.rename(columns=localization_map).to_excel(
-                writer, sheet_name='流量内卷 (Cannibalization)', index=False
+                writer, sheet_name=t('sheet_cannibal', default='Cannibalization'), index=False
             )
 
-        # Sheet 3: Structural Loss
         df_loss = breakeven_data.get('unprofitable_campaigns_df', pd.DataFrame())
         if not df_loss.empty:
             view = df_loss[
@@ -384,10 +365,9 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                 np.isinf(view['realized_acos']), 0.0, view['realized_acos']
             )
             view.rename(columns=localization_map).to_excel(
-                writer, sheet_name='结构亏损 (Loss)', index=False
+                writer, sheet_name=t('sheet_loss', default='Structural Loss'), index=False
             )
 
-        # Sheet 4: Winners
         if not df_winners.empty:
             view = df_winners[
                 [
@@ -402,8 +382,7 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                 ]
             ].copy()
             view.rename(columns=localization_map).to_excel(
-                writer, sheet_name='核心扩展 (Winners)', index=False
+                writer, sheet_name=t('sheet_winners', default='Winners'), index=False
             )
 
-    # 4. Return the binary string
     return buffer.getvalue()

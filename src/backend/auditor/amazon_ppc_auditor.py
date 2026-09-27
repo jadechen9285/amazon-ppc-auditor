@@ -264,7 +264,7 @@ class AmazonPPCAuditor:
 
         choices = [
             '需排查 (Investigate): 零转化，建议审查搜索词报告注入否定词',
-            '建议降价 (Deflate): ACoS 严重超标，考虑整体下调基础竞价 15-20%',
+            '建议降价 (Deflate): ACoS 严重超标，考虑整体下调基础竞价',
             '建议限额 (Cap Budget): 轻微亏损，考虑降低单日预算以提升流量效率',
         ]
 

@@ -150,8 +150,8 @@ TEXTS = {
         'en': '💡 Algorithm Explained (How We Calculate This)',
     },
     'tab1_expander_content': {
-        'zh': '**1. 🩸 无效点击止损：双引擎防御机制**\n传统的软件只会死板地规定“大于15次点击不出单就关闭”，这非常容易误判。我们采用了更贴近商业逻辑的双引擎算法：\n* **🚨 极速消耗 (流血太快):** 系统结合了您的客单价与左侧设置的**保本利润率**，算出了极限获客成本。如果某个词一单没出，但花费已经飙升超过了保本线的 **2 倍**，系统会无视天数立刻预警。（*商业逻辑：亏得太快，根本等不起亚马逊的数据延迟！*）\n* **⏳ 长期不转化 (慢性放血):** 对于花钱不快的词，系统会分析您平时的转化率。比如您平时 10 次点击能卖出一单，如果有个词被点了 15 次甚至更多却依然挂零，系统才会判定它在白嫖流量，建议立刻精准否定。\n\n**2. ⚔️ 流量内卷：避免“自己人打自己人”**\n有时候，您的自动广告、广泛匹配和词组匹配都在同时竞价抢夺同一个搜索词。这会导致您的多个广告组互相竞争，**自己抬高自己的单次点击费 (CPC)**。系统会帮您揪出这些“同室操戈”的词，指导您暂停多余的匹配，把钱花在转化率最高的那一个上。',
-        'en': "**1. 🩸 Zero-Sale Defense: Dual-Engine Algorithm**\nTraditional software strictly cuts keywords at '15 clicks without a sale', which causes false positives. We use a dynamic dual-engine:\n* **🚨 Fast Hemorrhage:** We combine your AOV and Target Break-even Margin to calculate your absolute maximum CPA. If a term spends 2x this threshold without a sale, we flag it immediately. *(Logic: You are losing money too fast to wait for Amazon's attribution lag)*.\n* **⏳ Chronic Non-Converter:** For slow spenders, we analyze historical CVR. If you usually convert at 10 clicks, and a term hits 15+ without a sale, we flag it.\n\n**2. ⚔️ Match-Type Cannibalization**\nSometimes Auto, Broad, and Phrase match compete against each other for the exact same search term. This artificially inflates your own CPC. We isolate these conflicts so you can pause redundant targets.",
+        'zh': '**1. 🩸 无效点击止损：双引擎防御机制**\n传统的软件只会死板地规定“大于15次点击不出单就关闭”，这非常容易误判。我们采用了更贴近商业逻辑的双引擎算法，为您计算出每一行的 **最大容忍点击数 (Max Tolerated Clicks)**：\n* **🚨 极速消耗 (流血太快):** 系统结合了您的客单价与左侧设置的保本利润率，算出极限获客成本。如果某个词一单没出，但花费极高，系统会严格压缩它的容忍点击数。（*商业逻辑：亏得太快，根本等不起亚马逊的数据延迟！*）\n* **⏳ 长期不转化 (慢性放血):** 对于花钱不快的词，系统会分析您平时的转化率，给出一个相对宽松的容忍点击数。\n👉 **怎么看表？** 当表格中的实际“点击量”超过了系统给出的“最大容忍点击数”时，即被判定为无效词，建议立刻精准否定。\n\n**2. ⚔️ 流量内卷：避免“自己人打自己人”**\n有时候，您的自动广告、广泛匹配和词组匹配都在同时竞价抢夺同一个搜索词。这会导致多个广告组互相竞争，自己抬高自己的单次点击费 (CPC)。系统会帮您揪出这些“同室操戈”的词，把钱花在转化率最高的那一个上。',
+        'en': "**1. 🩸 Zero-Sale Defense: Dual-Engine Algorithm**\nTraditional software strictly cuts keywords at '15 clicks without a sale', causing false positives. We dynamically calculate a **Max Tolerated Clicks** threshold for every single row:\n* **🚨 Fast Hemorrhage:** We combine your AOV and Target Break-even Margin. If a term is spending too fast without a sale, we strictly compress its tolerated clicks. *(Logic: You are losing money too fast to wait for Amazon's attribution lag)*.\n* **⏳ Chronic Non-Converter:** For slow spenders, we analyze historical CVR to grant a more lenient click threshold.\n👉 **How to read the table:** If actual 'Clicks' exceed our calculated 'Max Tolerated Clicks', the term is flagged. We recommend negating it immediately.\n\n**2. ⚔️ Match-Type Cannibalization**\nSometimes Auto, Broad, and Phrase match compete against each other for the exact same search term, artificially inflating your own CPC. We isolate these conflicts so you can pause redundant targets.",
     },
     'tab1_advice': {
         'zh': '点击量过高但从未产生订单的搜索词，建议立即添加为**精准否定 (Negative Exact)**。',
@@ -224,6 +224,33 @@ TEXTS = {
     'sheet_cannibal': {'zh': '流量内卷 (Cannibalization)', 'en': 'Cannibalization'},
     'sheet_loss': {'zh': '结构亏损 (Loss)', 'en': 'Structural Loss'},
     'sheet_winners': {'zh': '核心扩展 (Winners)', 'en': 'Winners'},
+    # ---------------------------------------------------------
+    # DataFrame Column Headers
+    # ---------------------------------------------------------
+    'col_bleeding_reason': {'zh': '诊断原因', 'en': 'Diagnosis Reason'},
+    'col_audit_action': {'zh': '操作建议', 'en': 'Action'},
+    'col_campaign_name': {'zh': '广告活动', 'en': 'Campaign'},
+    'col_ad_group_name': {'zh': '广告组', 'en': 'Ad Group'},
+    'col_match_type': {'zh': '匹配类型', 'en': 'Match Type'},
+    'col_targeting': {'zh': '投放词/ASIN', 'en': 'Targeting'},
+    'col_customer_search_term': {'zh': '客户搜索词', 'en': 'Search Term'},
+    'col_clicks': {'zh': '点击量', 'en': 'Clicks'},
+    'col_dynamic_click_threshold': {
+        'zh': '最大容忍点击数',
+        'en': 'Max Tolerated Clicks',
+    },  # Renamed & Clarified
+    'col_spend': {'zh': '花费', 'en': 'Spend'},
+    'col_status': {'zh': '状态', 'en': 'Status'},
+    'col_total_spend': {'zh': '总花费', 'en': 'Total Spend'},
+    'col_total_sales': {'zh': '总销售额', 'en': 'Total Sales'},
+    'col_total_orders': {'zh': '总订单量', 'en': 'Total Orders'},
+    'col_realized_acos': {'zh': '实际 ACoS', 'en': 'Actual ACoS'},
+    'col_allowable_spend': {'zh': '保本花费上限', 'en': 'Allowable Spend'},
+    'col_capital_lost': {'zh': '净利润流失', 'en': 'Capital Lost'},
+    'col_orders_7d': {'zh': '7天订单量', 'en': 'Orders (7D)'},
+    'col_acos': {'zh': 'ACoS', 'en': 'ACoS'},
+    'col_gross_profit': {'zh': '毛利润预估', 'en': 'Est. Gross Profit'},
+    'col_consultative_action': {'zh': '诊断建议', 'en': 'Diagnostic Action'},
 }
 
 

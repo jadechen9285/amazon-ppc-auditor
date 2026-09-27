@@ -2,9 +2,10 @@ import io
 
 import numpy as np
 import pandas as pd
+import plotly.express as px
 import streamlit as st
 
-from backend.telemetry import insert_telemetry_row  # 🚀 IMPORT REQUIRED FOR FEEDBACK
+from backend.telemetry import insert_telemetry_row
 from ui.contract import UIContract
 from ui.i18n import t
 
@@ -87,10 +88,13 @@ def _render_tab_bleeders(df_bleeders, cannibal_data):
     st.write(t('tab1_advice'))
 
     if not df_bleeders.empty:
+        df_bleeders_view = df_bleeders.copy()
+        df_bleeders_view = df_bleeders_view.rename(columns={'audit_action': 'bleeding_reason'})
+
         st.dataframe(
-            df_bleeders[
+            df_bleeders_view[
                 [
-                    'audit_action',
+                    'bleeding_reason',
                     'campaign_name',
                     'ad_group_name',
                     'match_type',
@@ -102,7 +106,7 @@ def _render_tab_bleeders(df_bleeders, cannibal_data):
                 ]
             ],
             column_config={
-                'audit_action': UIContract.get_label('audit_action'),
+                'bleeding_reason': UIContract.get_label('bleeding_reason'),
                 'campaign_name': UIContract.get_label('campaign_name'),
                 'ad_group_name': UIContract.get_label('ad_group_name'),
                 'match_type': UIContract.get_label('match_type'),
@@ -119,6 +123,7 @@ def _render_tab_bleeders(df_bleeders, cannibal_data):
             use_container_width=True,
             hide_index=True,
         )
+
     else:
         st.success(t('tab1_success'))
         st.balloons()
@@ -166,24 +171,44 @@ def _render_tab_structural_loss(breakeven_data, global_margin):
         st.write(t('tab2_chart_title'))
         st.caption(t('tab2_chart_caption'))
 
-        excel_map = UIContract.get_excel_map()
-        chart_view = df_loss[['total_sales', 'total_spend', 'capital_lost']].copy()
-        chart_map = {
-            'total_sales': excel_map['total_sales'],
-            'total_spend': excel_map['total_spend'],
-            'capital_lost': excel_map['capital_lost'],
-        }
-        chart_view = chart_view.rename(columns=chart_map)
-
-        st.scatter_chart(
-            chart_view,
-            x=excel_map['total_sales'],
-            y=excel_map['total_spend'],
-            size=excel_map['capital_lost'],
-            color='#ff4b4b',
-            height=350,
+        # ---------------------------------------------------------
+        # 🚀 UPGRADED: Plotly Interactive Chart
+        # ---------------------------------------------------------
+        fig = px.scatter(
+            df_loss,
+            x='total_sales',
+            y='total_spend',
+            size='capital_lost',
+            hover_name='campaign_name',  # Displays Campaign Name prominently on hover
+            hover_data={
+                'total_sales': ':$.2f',
+                'total_spend': ':$.2f',
+                'capital_lost': ':$.2f',
+                'realized_acos': ':.2%',
+            },
+            labels={
+                'total_sales': UIContract.get_label('total_sales'),
+                'total_spend': UIContract.get_label('total_spend'),
+                'capital_lost': UIContract.get_label('capital_lost'),
+                'realized_acos': UIContract.get_label('realized_acos'),
+            },
+            color_discrete_sequence=['#ff4b4b'],
         )
 
+        # Transparent background to match Streamlit's native light/dark mode
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=20, b=0),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            xaxis_title=UIContract.get_label('total_sales'),
+            yaxis_title=UIContract.get_label('total_spend'),
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # ---------------------------------------------------------
+        # DataFrame Rendering
+        # ---------------------------------------------------------
         df_loss_view = df_loss.copy()
         df_loss_view['realized_acos'] = np.where(
             np.isinf(df_loss_view['realized_acos']), 0.0, df_loss_view['realized_acos'] * 100
@@ -301,8 +326,6 @@ def _render_feedback_section():
 # -------------------------------------------------------------
 # 📄 EXCEL EXPORT ENGINE
 # -------------------------------------------------------------
-
-
 def generate_excel_report(auditor, global_margin: float) -> bytes:
     """Compiles the audit into a multi-sheet Excel binary buffer."""
     df_bleeders = auditor.extract_zero_sale_terms(global_margin_float=global_margin)
@@ -328,6 +351,10 @@ def generate_excel_report(auditor, global_margin: float) -> bytes:
                     'spend',
                 ]
             ].copy()
+
+            # 🚀 THE FIX: Rename the column before applying the global localization map
+            view = view.rename(columns={'audit_action': 'bleeding_reason'})
+
             view.rename(columns=localization_map).to_excel(
                 writer, sheet_name=t('sheet_bleeders', default='Bleeders'), index=False
             )

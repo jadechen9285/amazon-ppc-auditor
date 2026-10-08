@@ -2473,11 +2473,16 @@ name = "startup-inventory-management"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "plotly" },
     { name = "python-dotenv" },
     { name = "scipy" },
+    { name = "seaborn" },
+    { name = "streamlit" },
+    { name = "streamlit-authenticator" },
     { name = "tabulate" },
     { name = "xlsxwriter" },
 ]
@@ -2488,21 +2493,19 @@ dev = [
     { name = "pre-commit" },
     { name = "ruff" },
 ]
-viz = [
-    { name = "matplotlib" },
-    { name = "plotly" },
-    { name = "seaborn" },
-    { name = "streamlit" },
-    { name = "streamlit-authenticator" },
-]
 
 [package.metadata]
 requires-dist = [
+    { name = "matplotlib", specifier = ">=3.11.1" },
     { name = "numpy", specifier = ">=2.5.2" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=3.0.5" },
+    { name = "plotly", specifier = ">=7.0.0" },
     { name = "python-dotenv", specifier = ">=1.2.3" },
     { name = "scipy", specifier = ">=1.18.1" },
+    { name = "seaborn", specifier = ">=0.13.2" },
+    { name = "streamlit", specifier = ">=1.62.0" },
+    { name = "streamlit-authenticator", specifier = ">=0.4.2" },
     { name = "tabulate", specifier = ">=0.10.0" },
     { name = "xlsxwriter", specifier = ">=3.2.9" },
 ]
@@ -2512,13 +2515,6 @@ dev = [
     { name = "jupyterlab", specifier = ">=4.6.3" },
     { name = "pre-commit", specifier = ">=4.6.2" },
     { name = "ruff", specifier = "==0.16.7" },
-]
-viz = [
-    { name = "matplotlib", specifier = ">=3.11.1" },
-    { name = "plotly", specifier = ">=7.0.0" },
-    { name = "seaborn", specifier = ">=0.13.2" },
-    { name = "streamlit", specifier = ">=1.62.0" },
-    { name = "streamlit-authenticator", specifier = ">=0.4.2" },
 ]
 
 [[package]]

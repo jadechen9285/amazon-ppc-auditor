@@ -15,6 +15,11 @@ dependencies = [
     "scipy>=1.18.1",
     "tabulate>=0.10.0",
     "xlsxwriter>=3.2.9",
+    "matplotlib>=3.11.1",
+    "plotly>=7.0.0",
+    "seaborn>=0.13.2",
+    "streamlit>=1.62.0",
+    "streamlit-authenticator>=0.4.2",
 ]
 
 
@@ -34,13 +39,6 @@ dev = [
     "jupyterlab>=4.6.3",
     "pre-commit>=4.6.2",
     "ruff==0.16.7",
-]
-viz = [
-    "matplotlib>=3.11.1",
-    "plotly>=7.0.0",
-    "seaborn>=0.13.2",
-    "streamlit>=1.62.0",
-    "streamlit-authenticator>=0.4.2",
 ]
 
 [tool.ruff]

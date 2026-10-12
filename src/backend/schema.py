@@ -14,19 +14,19 @@ class AmazonSPSchema:
     """
 
     # The Global Resolution Set
-    # We include every known variation in both English and Chinese.
     ALIAS_MAP = {
-        'start_date': {'开始日期', 'start date', 'date'},  # Absorbs legacy 'Date'
+        # 🚀 FIX: Added '日期' to absorb Chinese Daily reports
+        'start_date': {'开始日期', 'start date', 'date', '日期'},  
         'end_date': {'结束日期', 'end date'},
         'campaign_name': {'广告活动名称', 'campaign name'},
-        'ad_group_name': {'广告组合名称', 'ad group name'},
+        # 🚀 FIX: Added '广告组名称' (Ad Group). '广告组合' is actually Portfolio in Amazon PPC.
+        'ad_group_name': {'广告组名称', '广告组合名称', 'ad group name'}, 
         'targeting': {'投放', 'targeting'},
         'match_type': {'匹配类型', 'match type'},
         'customer_search_term': {'客户搜索词', 'customer search term'},
         'impressions': {'展示量', 'impressions'},
         'clicks': {'点击量', 'clicks'},
         'spend': {'花费', 'spend'},
-        # Amazon notoriously changes the bracket format: (#), (), or nothing
         'orders_7d': {
             '7天总订单数(#)',
             '7 day total orders (#)',
@@ -88,7 +88,7 @@ class AmazonSPSchema:
         df_clean = df_clean.rename(columns=resolution_matrix)
 
         # --- THE LEGACY SCHEMA FIX ---
-        # If the user uploaded a legacy report with only 'Date' (start_date),
+        # If the user uploaded a legacy/daily report with only 'Date' (start_date),
         # we dynamically duplicate it to 'end_date' so the backend math doesn't crash.
         if 'start_date' in df_clean.columns and 'end_date' not in df_clean.columns:
             df_clean['end_date'] = df_clean['start_date']

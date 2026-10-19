@@ -10,7 +10,7 @@ from ui.i18n import t
 
 # Enforce wide layout
 st.set_page_config(
-    page_title='SP PPC Auditor | Alpha',
+    page_title='Amazon PPC Auditor | Alpha',
     page_icon='📊',
     layout='wide',
     initial_sidebar_state='expanded',

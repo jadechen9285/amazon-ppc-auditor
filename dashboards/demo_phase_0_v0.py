@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(
-    page_title='Ad Margin Rescuer | Executive Dashboard', page_icon='📈', layout='wide'
+    page_title='Amazon PPC Auditor | Executive Dashboard (Demo)', page_icon='📈', layout='wide'
 )
 
 st.title('📈 Ad Budget Reallocation Copilot')

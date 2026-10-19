@@ -9,7 +9,7 @@ from scipy.optimize import minimize
 # ==========================================
 # 0. CONFIG & SAAS STYLING
 # ==========================================
-st.set_page_config(page_title='Ad Margin Rescuer | CPC Optimizer', page_icon='🎯', layout='wide')
+st.set_page_config(page_title='Amazon PPC Auditor | CPC Optimizer (Demo)', page_icon='🎯', layout='wide')
 
 
 def inject_saas_styling():

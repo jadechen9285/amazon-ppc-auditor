@@ -65,7 +65,8 @@ def build_realistic_seller_dataset(
     # -------------------------------------------------------------------------
     sampled_skus = sku_summary.sample(n=target_n_rows, replace=True).reset_index(drop=True)
     dates = pd.date_range(start='2026-08-01', periods=30)
-    sampled_dates = np.random.choice(dates, target_n_rows)
+    # Wrap in a DatetimeIndex so elements are Timestamps (np.datetime64 has no .month)
+    sampled_dates = pd.DatetimeIndex(np.random.choice(dates, target_n_rows))
 
     ad_report = pd.DataFrame(
         {

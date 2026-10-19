@@ -1,5 +1,5 @@
-# 1. Export core dependencies + the 'viz' group, stripping strict hashes
-uv export --group viz --no-dev --no-hashes > requirements.txt
+# 1. Export runtime dependencies (no dev tooling), stripping strict hashes
+uv export --no-dev --no-hashes > requirements.txt
 
 # 2. Append the Hatchling package mounting instruction
-echo "-e ." >> requirements.txt # in case the file doesnt add it automatically
+grep -qxF -- "-e ." requirements.txt || echo "-e ." >> requirements.txt

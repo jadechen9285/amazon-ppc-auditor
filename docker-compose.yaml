@@ -1,7 +1,7 @@
 services:
-  cpc-optimizer:
+  amazon-ppc-auditor:
     build: .
-    container_name: margin-rescuer-app
+    container_name: amazon-ppc-auditor
     ports:
       - "8501:8501"
     restart: unless-stopped

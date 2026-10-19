@@ -1,7 +1,7 @@
 [project]
-name = "startup-inventory-management"
+name = "amazon-ppc-auditor"
 version = "0.1.0"
-description = "Add your description here"
+description = "Privacy-first audit engine for Amazon Sponsored Products search term reports: find wasted spend, cannibalization, break-even leaks and scaling opportunities."
 readme = "README.md"
 authors = [
     { name = "Jianhong Chen", email = "jjianhongchen@gmail.com" }
@@ -20,6 +20,7 @@ dependencies = [
     "seaborn>=0.13.2",
     "streamlit>=1.62.0",
     "streamlit-authenticator>=0.4.2",
+    "requests>=2.34.2",
 ]
 
 
@@ -38,8 +39,15 @@ default = true
 dev = [
     "jupyterlab>=4.6.3",
     "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "ruff==0.16.7",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-ra"
 
 [tool.ruff]
 target-version = "py312"

@@ -16,11 +16,11 @@ class AmazonSPSchema:
     # The Global Resolution Set
     ALIAS_MAP = {
         # 🚀 FIX: Added '日期' to absorb Chinese Daily reports
-        'start_date': {'开始日期', 'start date', 'date', '日期'},  
+        'start_date': {'开始日期', 'start date', 'date', '日期'},
         'end_date': {'结束日期', 'end date'},
         'campaign_name': {'广告活动名称', 'campaign name'},
         # 🚀 FIX: Added '广告组名称' (Ad Group). '广告组合' is actually Portfolio in Amazon PPC.
-        'ad_group_name': {'广告组名称', '广告组合名称', 'ad group name'}, 
+        'ad_group_name': {'广告组名称', '广告组合名称', 'ad group name'},
         'targeting': {'投放', 'targeting'},
         'match_type': {'匹配类型', 'match type'},
         'customer_search_term': {'客户搜索词', 'customer search term'},

@@ -18,3 +18,8 @@ notebooks
 
 # streamlit secrets
 .streamlit/secrets.toml
+
+# test / coverage artifacts
+.coverage
+.pytest_cache/
+htmlcov/

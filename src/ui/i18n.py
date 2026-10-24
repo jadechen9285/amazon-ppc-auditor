@@ -2,7 +2,7 @@ import streamlit as st
 
 TEXTS = {
     # ---------------------------------------------------------
-    # 1. Main Landing & Gatekeeper
+    # 1. Main Landing
     # ---------------------------------------------------------
     'main_title': {'zh': '📊 亚马逊 SP 广告深度审计专家', 'en': '📊 Amazon SP Ads Deep Auditor'},
     'main_subtitle': {
@@ -24,24 +24,6 @@ TEXTS = {
     'upload_instruction': {
         'zh': '👈 请在左侧边栏上传从亚马逊卖家中心导出的搜索词报表开始审计。',
         'en': '👈 Please upload your Search Term Report from Amazon Seller Central in the left sidebar to begin.',
-    },
-    'alpha_title': {
-        'zh': '### 🔒 卖家受邀内测通道 (Private Alpha)',
-        'en': '### 🔒 Private Alpha Access',
-    },
-    'alpha_caption': {
-        'zh': '亚马逊 Sponsored Products 广告深度诊断与结构止损系统',
-        'en': 'Amazon Sponsored Products Diagnostic & Profit Recovery System',
-    },
-    'alpha_info': {
-        'zh': '👋 本系统目前处于特邀内测阶段。请输入您的专属邀请码开启分析。',
-        'en': '👋 This system is currently in private beta. Please enter your invite code.',
-    },
-    'alpha_input': {'zh': '内测邀请码 (Invite Code)', 'en': 'Invite Code'},
-    'alpha_button': {'zh': '进入系统', 'en': 'Enter System'},
-    'alpha_error': {
-        'zh': '❌ 邀请码无效，请联系技术顾问获取访问权限。',
-        'en': '❌ Invalid code. Please contact your technical advisor.',
     },
     # ---------------------------------------------------------
     # 2. Sidebar Controls

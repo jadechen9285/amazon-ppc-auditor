@@ -5,13 +5,13 @@ from ui.i18n import TEXTS, t
 
 
 def test_defaults_to_english():
-    assert t('alpha_button') == 'Enter System'
+    assert t('financial_setup') == '### ⚙️ Financial Setup'
 
 
 def test_returns_chinese_when_selected(session_state):
     session_state['lang'] = 'zh'
 
-    assert t('alpha_button') == '进入系统'
+    assert t('financial_setup') == '### ⚙️ 财务配置'
 
 
 def test_unknown_key_falls_back_to_key():

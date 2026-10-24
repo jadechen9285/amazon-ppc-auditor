@@ -25,7 +25,6 @@ This guide explains how to audit your Amazon Sponsored Products (SP) campaigns w
 
 You need:
 
-- **An invite code.** The app is in private alpha. Ask your account contact for a code.
 - **Access to the Amazon Ads console** (Seller Central → Advertising) for the account you want to audit.
 - **Your product margin**, i.e. what's left of the selling price after product cost and Amazon fees, before advertising. See [step 3](#3-set-your-break-even-margin).
 
@@ -67,9 +66,8 @@ If your products have different margins, use a blended average. The default is 3
 ## 4. Upload and run the audit
 
 1. Open the app and pick **English** or **中文** at the top of the sidebar.
-2. Enter your invite code and click **Enter System**.
-3. Set the break-even margin.
-4. Upload your report with **Upload Search Term Report**.
+2. Set the break-even margin.
+3. Upload your report with **Upload Search Term Report**.
 
 The audit runs straight away. A banner shows how many days the report covers:
 

@@ -26,7 +26,6 @@ The production app is a single Streamlit script backed by a pure-pandas engine. 
 dashboards/ppc_audit_report.py           ← Streamlit entrypoint (one script run per interaction)
  │
  ├─ language toggle  → st.session_state['lang']        (ui/i18n.py)
- ├─ invite-code gate → ALPHA_INVITE_CODE env var
  ├─ sidebar          → margin slider, file uploader (≤ 15 MB)
  │
  ├─ pd.read_excel / pd.read_csv (CSV delimiter sniffing: , \t ;)
@@ -63,7 +62,7 @@ uv run pre-commit install
 uv run streamlit run dashboards/ppc_audit_report.py
 ```
 
-The app runs at http://localhost:8501. With no `ALPHA_INVITE_CODE` set, the gate falls back to the default code in `ppc_audit_report.py`.
+The app runs at http://localhost:8501. No login or invite code is required.
 
 The `backend` and `ui` packages are importable because the project is installed into the venv as a package (`[tool.hatch.build.targets.wheel] packages = ["src/backend", "src/ui"]`). Pytest also adds `src/` to `sys.path` through `pythonpath = ["src"]`.
 
@@ -152,7 +151,6 @@ uv run ruff check . --fix && uv run ruff format .
 
 | Name | Source | Used by | Notes |
 | --- | --- | --- | --- |
-| `ALPHA_INVITE_CODE` | environment variable | `ppc_audit_report.py` | Invite code for the gate. **Set it in every deployment.** Otherwise the default in the source code applies |
 | `SUPABASE_URL` | `st.secrets` | `telemetry.py` | Optional. Telemetry is off when missing |
 | `SUPABASE_KEY` | `st.secrets` | `telemetry.py` | Optional. Telemetry is off when missing |
 | `BASE_DATA_PATH`, `REAL_DATA_PATH`, `SYNTHETIC_DATA_PATH` | `.env` (see `.env.template`) | notebooks and experiments | Not used by the production app |
@@ -160,7 +158,6 @@ uv run ruff check . --fix && uv run ruff format .
 For local secrets, create `.streamlit/secrets.toml` (it's gitignored):
 
 ```toml
-ALPHA_INVITE_CODE = "your-code"
 SUPABASE_URL = "https://<project>.supabase.co"
 SUPABASE_KEY = "<anon-key>"
 ```
@@ -189,9 +186,9 @@ The live app is **https://ppcx-app.streamlit.app/**.
 | Repository / branch | `jadechen9285/amazon-ppc-auditor` / `main` |
 | Main file path | `dashboards/ppc_audit_report.py` |
 | Python version | 3.12 |
-| Secrets | `ALPHA_INVITE_CODE`, `SUPABASE_URL`, `SUPABASE_KEY` (in *App settings → Secrets*, TOML format) |
+| Secrets | Optional: `SUPABASE_URL`, `SUPABASE_KEY` (in *App settings → Secrets*, TOML format) |
 
-Community Cloud redeploys automatically when `main` changes. Top-level secrets are also exposed as environment variables, so `ALPHA_INVITE_CODE` reaches `os.environ`. If the platform needs a `requirements.txt`, generate one with:
+Community Cloud redeploys automatically when `main` changes. If the platform needs a `requirements.txt`, generate one with:
 
 ```bash
 bash scripts/generate_req_text.sh
@@ -205,7 +202,7 @@ bash scripts/generate_req_text.sh
 docker compose up --build
 ```
 
-The image installs only runtime dependencies (`uv sync --frozen --no-dev`), copies `src/`, `dashboards/` and `.streamlit/`, and serves `dashboards/ppc_audit_report.py` on port 8501. Pass `ALPHA_INVITE_CODE` through `environment:` in `docker-compose.yaml`.
+The image installs only runtime dependencies (`uv sync --frozen --no-dev`), copies `src/`, `dashboards/` and `.streamlit/`, and serves `dashboards/ppc_audit_report.py` on port 8501.
 
 ### Release checklist
 

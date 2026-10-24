@@ -179,7 +179,7 @@ Telemetry must never include report contents.
 
 ### Streamlit Community Cloud (production)
 
-The live app is **https://ppcx-app.streamlit.app/**.
+The live app is **https://open-ppcx.streamlit.app/**.
 
 | Setting | Value |
 | --- | --- |

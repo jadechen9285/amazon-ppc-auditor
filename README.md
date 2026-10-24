@@ -8,7 +8,7 @@
 ![Ruff](https://img.shields.io/badge/lint-ruff-d7ff64)
 ![Tests](https://img.shields.io/badge/tests-pytest-0a9edc)
 
-### 🚀 [Try the live app → ppcx-app.streamlit.app](https://ppcx-app.streamlit.app/)
+### 🚀 [Try the live app → open-ppcx.streamlit.app](https://open-ppcx.streamlit.app/)
 
 ---
 
@@ -91,7 +91,7 @@ For the most reliable results, use at least **14 days** of data. The app warns y
 
 ## Quick start
 
-**Hosted:** open https://ppcx-app.streamlit.app/ and upload a report. Nothing to install.
+**Hosted:** open https://open-ppcx.streamlit.app/ and upload a report. Nothing to install.
 
 **Run locally:** you need Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
@@ -168,7 +168,7 @@ The tests use small, hand-built reports (see `tests/conftest.py`). Every expecte
 
 ## Deployment
 
-Production runs on **Streamlit Community Cloud** at https://ppcx-app.streamlit.app/. It's served from `dashboards/ppc_audit_report.py` on `main` and redeploys automatically on every push. Optional secrets (`SUPABASE_URL` / `SUPABASE_KEY`) are configured in the app settings. A Docker image is also provided for self-hosting. Details are in the [Developer Guide](docs/developer-guide.md#8-deployment).
+Production runs on **Streamlit Community Cloud** at https://open-ppcx.streamlit.app/. It's served from `dashboards/ppc_audit_report.py` on `main` and redeploys automatically on every push. Optional secrets (`SUPABASE_URL` / `SUPABASE_KEY`) are configured in the app settings. A Docker image is also provided for self-hosting. Details are in the [Developer Guide](docs/developer-guide.md#8-deployment).
 
 ## Roadmap
 

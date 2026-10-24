@@ -4,7 +4,7 @@
 
 This guide explains how to audit your Amazon Sponsored Products (SP) campaigns with **Amazon PPC Auditor** and how to act on the results.
 
-**Live app:** https://ppcx-app.streamlit.app/
+**Live app:** https://open-ppcx.streamlit.app/
 
 ---
 

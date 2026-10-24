@@ -4,7 +4,7 @@
 
 本指南介绍如何使用 **Amazon PPC Auditor（亚马逊 SP 广告深度审计）** 诊断您的 Sponsored Products 广告，并根据审计结果采取行动。
 
-**在线使用：** https://ppcx-app.streamlit.app/
+**在线使用：** https://open-ppcx.streamlit.app/
 
 ---
 
